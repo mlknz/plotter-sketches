@@ -4,6 +4,11 @@
 //const convexHull = require('convex-hull');
 const canvasSketch = require('canvas-sketch');
 const load = require('load-asset');
+
+const loadsvg = require('load-svg');
+const segments = require('svg-line-segments');
+const linearize = require('svg-linearize');
+
 const { polylinesToSVG } = require('canvas-sketch-util/penplot');
 import { generatePoints, segmentsEqual, pointsEqual, addSegmentsFromPolys, getBMPColor, pointInBMPMask } from "./utils.js";
 import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
@@ -12,17 +17,23 @@ const debug = {
     drawPoints: false,
     duplicateSegments: 0
 };
-const bmpSise = 256;
+const bmpSize = 256;
+const svgSize = 256;
 const randomPointsCount = 15000;
 const margin = 2;
 
 const penThicknessCm = 0.03;
+const boldPenThicknessCm = 0.09;
+
+let teethSVGSegments;
+loadsvg('img/lips/teeth.svg', async(err, svg) => {
+  teethSVGSegments = await segments(await linearize(svg));
+});
 
 const sketch = async ({ width, height, units, render }) => {
 
   const image_lips_up = await load('img/lips/lips_up_details.png');
   const image_lips_down = await load('img/lips/lips_down_details.png');
-  //const image_lips_teeth = await load('img_seed/lips/lips_teeth.png');
 
   const pointsRandom = generatePoints(randomPointsCount, width, height, margin);
 
@@ -32,20 +43,36 @@ const sketch = async ({ width, height, units, render }) => {
 
   var tmpContext = canvas.getContext('2d');
   tmpContext.imageSmoothingEnabled = false;
-  tmpContext.clearRect(0, 0, bmpSise, bmpSise);
-  tmpContext.drawImage(image_lips_up, 0, 0, bmpSise, bmpSise);
-  const lips_up_bmp = tmpContext.getImageData(0, 0, bmpSise, bmpSise);
-  tmpContext.clearRect(0, 0, bmpSise, bmpSise);
-  tmpContext.drawImage(image_lips_down, 0, 0, bmpSise, bmpSise);
-  const lips_down_bmp = tmpContext.getImageData(0, 0, bmpSise, bmpSise);
+  tmpContext.clearRect(0, 0, bmpSize, bmpSize);
+  tmpContext.drawImage(image_lips_up, 0, 0, bmpSize, bmpSize);
+  const lips_up_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
+  tmpContext.clearRect(0, 0, bmpSize, bmpSize);
+  tmpContext.drawImage(image_lips_down, 0, 0, bmpSize, bmpSize);
+  const lips_down_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
 
   const lipsUpPolys = voronoiPolysFromPointsAndMask(pointsRandom, width, height, margin, lips_up_bmp);
   const lipsDownPolys = voronoiPolysFromPointsAndMask(pointsRandom, width, height, margin, lips_down_bmp);
 
+  const points = [];
   const lines = [];
   addSegmentsFromPolys(lipsUpPolys.fullyInside, lines, debug);
   addSegmentsFromPolys(lipsDownPolys.fullyInside, lines, debug);
   console.log("Remove duplicates ", debug.duplicateSegments, "of total ", lines.length + debug.duplicateSegments);
+
+  const mapSegCoords = (seg) => {
+      let x = (seg[0] / svgSize) * (width - margin*2) + margin;
+      let y = (seg[1] / svgSize) * (height - margin*2) + margin;
+
+      return [x, y];
+  }
+
+  const boldLines = [];
+  teethSVGSegments.forEach(seg => {
+      for (let i = 0; i < seg.length - 1; ++i)
+      {
+          boldLines.push([mapSegCoords(seg[i]), mapSegCoords(seg[i + 1])]);
+      }
+  });
 
 // const loop = setInterval(() => {
 //   const remaining = integrate();
@@ -58,13 +85,22 @@ return ({ context }) => {
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
 
-    //context.drawImage(image_lips_down, margin, margin, width - margin, height - margin);
+    //context.drawImage(svg_teeth, margin, margin, width - margin, height - margin);
 
     lines.forEach(points => {
       context.beginPath();
       points.forEach(p => context.lineTo(p[0], p[1]));
       context.strokeStyle = 'black';
       context.lineWidth = penThicknessCm;
+      context.lineJoin = 'round';
+      context.lineCap = 'round';
+      context.stroke();
+    });
+    boldLines.forEach(points => {
+      context.beginPath();
+      points.forEach(p => context.lineTo(p[0], p[1]));
+      context.strokeStyle = 'black';
+      context.lineWidth = boldPenThicknessCm;
       context.lineJoin = 'round';
       context.lineCap = 'round';
       context.stroke();
