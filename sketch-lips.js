@@ -13,15 +13,15 @@ const debug = {
     duplicateSegments: 0
 };
 const bmpSise = 256;
-const randomPointsCount = 9000;
+const randomPointsCount = 15000;
 const margin = 2;
 
-const penThicknessCm = 0.02;
+const penThicknessCm = 0.03;
 
 const sketch = async ({ width, height, units, render }) => {
 
-  const image_lips_up = await load('img/lips/lips_up.png');
-  const image_lips_down = await load('img/lips/lips_down.png');
+  const image_lips_up = await load('img/lips/lips_up_details.png');
+  const image_lips_down = await load('img/lips/lips_down_details.png');
   //const image_lips_teeth = await load('img_seed/lips/lips_teeth.png');
 
   const pointsRandom = generatePoints(randomPointsCount, width, height, margin);
@@ -90,7 +90,7 @@ return ({ context }) => {
   };
 };
 canvasSketch(sketch, {
-  dimensions: [ 12, 12 ],
+  dimensions: [ 15, 15 ],
   pixelsPerInch: 300,
   units: 'cm',
 });
