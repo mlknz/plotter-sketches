@@ -23,11 +23,11 @@ const randomPointsCount = 15000;
 const margin = 2;
 
 const penThicknessCm = 0.03;
-const boldPenThicknessCm = 0.09;
+const boldPenThicknessCm = 0.03;
 
 let teethSVGSegments;
-loadsvg('img/lips/teeth.svg', async(err, svg) => {
-  teethSVGSegments = await segments(await linearize(svg));
+loadsvg('img/lips/teeth_rough.svg', async(err, svg) => {
+  teethSVGSegments = await segments(await linearize(svg, { tolerance: 0 }));
 });
 
 const sketch = async ({ width, height, units, render }) => {
