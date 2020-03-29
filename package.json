@@ -1,0 +1,21 @@
+{
+  "name": "my-sketches",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sketch.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "canvas-sketch": "^0.7.3",
+    "canvas-sketch-util": "^1.10.0",
+    "convex-hull": "^1.0.3",
+    "d3-delaunay": "^5.2.1",
+    "density-clustering": "^1.3.0",
+    "load-asset": "^1.2.0",
+    "manhattan-voronoi": "^1.0.2"
+  }
+}
