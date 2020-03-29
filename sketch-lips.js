@@ -1,16 +1,22 @@
 // canvas-sketch sketch-lips.js --open --output=export/
 
-const canvasSketch = require('canvas-sketch');
-const { polylinesToSVG } = require('canvas-sketch-util/penplot');
 //const clustering = require('density-clustering');
 //const convexHull = require('convex-hull');
+const canvasSketch = require('canvas-sketch');
 const load = require('load-asset');
-import {Delaunay} from "d3-delaunay";
-import {generatePoints, segmentsEqual, pointsEqual, getBMPColor, pointInBMPMask} from "./utils.js"
+const { polylinesToSVG } = require('canvas-sketch-util/penplot');
+import { generatePoints, segmentsEqual, pointsEqual, addSegmentsFromPolys, getBMPColor, pointInBMPMask } from "./utils.js";
+import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
 
-const debug = false;
-const penThicknessCm = 0.02;
+const debug = {
+    drawPoints: false,
+    duplicateSegments: 0
+};
+const bmpSise = 256;
+const randomPointsCount = 9000;
 const margin = 2;
+
+const penThicknessCm = 0.02;
 
 const sketch = async ({ width, height, units, render }) => {
 
@@ -18,65 +24,28 @@ const sketch = async ({ width, height, units, render }) => {
   const image_lips_down = await load('img/lips/lips_down.png');
   //const image_lips_teeth = await load('img_seed/lips/lips_teeth.png');
 
-  const pointsRandom = generatePoints(9000, width, height, margin);
+  const pointsRandom = generatePoints(randomPointsCount, width, height, margin);
 
   var canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 1024;
+  canvas.width = 256;
+  canvas.height = 256;
 
   var tmpContext = canvas.getContext('2d');
   tmpContext.imageSmoothingEnabled = false;
-  tmpContext.drawImage(image_lips_up, 0, 0, 256, 256);
-  const lips_up_bmp = tmpContext.getImageData(0, 0, 256, 256);
+  tmpContext.clearRect(0, 0, bmpSise, bmpSise);
+  tmpContext.drawImage(image_lips_up, 0, 0, bmpSise, bmpSise);
+  const lips_up_bmp = tmpContext.getImageData(0, 0, bmpSise, bmpSise);
+  tmpContext.clearRect(0, 0, bmpSise, bmpSise);
+  tmpContext.drawImage(image_lips_down, 0, 0, bmpSise, bmpSise);
+  const lips_down_bmp = tmpContext.getImageData(0, 0, bmpSise, bmpSise);
 
-  const points = pointsRandom.filter((entry) => {
-      return pointInBMPMask(entry, width, height, margin, lips_up_bmp);
-  });
+  const lipsUpPolys = voronoiPolysFromPointsAndMask(pointsRandom, width, height, margin, lips_up_bmp);
+  const lipsDownPolys = voronoiPolysFromPointsAndMask(pointsRandom, width, height, margin, lips_down_bmp);
 
-  const delaunay = Delaunay.from(points);
-  //const delaPolyGen = delaunay.trianglePolygons();
-  const voronoi = delaunay.voronoi([margin, margin, width - margin, height - margin]);
-  const voroPolyGen = voronoi.cellPolygons();
-  const polys = [];
-  const partiallyInsidePolys = [];
   const lines = [];
-
-  while (true)
-  {
-      const poly = voroPolyGen.next();
-      if (poly.done) break;
-      let fullyInside = true;
-      let partiallyInside = false;
-
-      for (let i = 0; i < poly.value.length; ++i)
-      {
-          if (pointInBMPMask(poly.value[i], width, height, margin, lips_up_bmp)) partiallyInside = true;
-          else fullyInside = false;
-      }
-
-      if (fullyInside) polys.push(poly.value);
-      else if (partiallyInside) partiallyInsidePolys.push(poly.value);
-  }
-
-  let duplicateSegments = 0;
-  polys.forEach(p => {
-      for (let i = 0; i < p.length; ++i)
-      {
-          let ind2 = (i + 1) % p.length;
-          let isDuplicate = false;
-          for (let j = 0; j < lines.length; ++j)
-          {
-              if (segmentsEqual(p[i], p[ind2], lines[j][0], lines[j][1]) || pointsEqual(p[i], p[ind2]))
-                {
-                    isDuplicate = true;
-                    duplicateSegments++;
-                    break;
-                }
-          }
-          if (!isDuplicate) lines.push([p[i], p[ind2]]);
-      }
-  });
-  console.log("Remove duplicates ", duplicateSegments, "of total ", lines.length + duplicateSegments);
+  addSegmentsFromPolys(lipsUpPolys.fullyInside, lines, debug);
+  addSegmentsFromPolys(lipsDownPolys.fullyInside, lines, debug);
+  console.log("Remove duplicates ", debug.duplicateSegments, "of total ", lines.length + debug.duplicateSegments);
 
 // const loop = setInterval(() => {
 //   const remaining = integrate();
@@ -89,19 +58,19 @@ return ({ context }) => {
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
 
-    //context.drawImage(image_lips_up, margin, margin, width - margin, height - margin);
+    //context.drawImage(image_lips_down, margin, margin, width - margin, height - margin);
 
     lines.forEach(points => {
       context.beginPath();
       points.forEach(p => context.lineTo(p[0], p[1]));
-      context.strokeStyle = debug ? 'blue' : 'black';
+      context.strokeStyle = 'black';
       context.lineWidth = penThicknessCm;
       context.lineJoin = 'round';
       context.lineCap = 'round';
       context.stroke();
     });
 
-    if (debug) {
+    if (debug.drawPoints) {
       points.forEach(p => {
         context.beginPath();
         context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);

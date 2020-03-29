@@ -20,6 +20,27 @@ export function segmentsEqual(a, b, c, d)
     return (pointsEqual(a, c) && pointsEqual(b, d)) || (pointsEqual(a, d) && pointsEqual(b, c));
 }
 
+export function addSegmentsFromPolys(polys, lines, debug)
+{
+    polys.forEach(p => {
+        for (let i = 0; i < p.length; ++i)
+        {
+            let ind2 = (i + 1) % p.length;
+            let isDuplicate = false;
+            for (let j = 0; j < lines.length; ++j)
+            {
+                if (segmentsEqual(p[i], p[ind2], lines[j][0], lines[j][1]) || pointsEqual(p[i], p[ind2]))
+                  {
+                      isDuplicate = true;
+                      debug.duplicateSegments++;
+                      break;
+                  }
+            }
+            if (!isDuplicate) lines.push([p[i], p[ind2]]);
+        }
+    });
+}
+
 export function getBMPColor(bmp, x, y) {
     let itr = y * bmp.width * 4 + x * 4;
     return [bmp.data[itr], bmp.data[itr + 1],  bmp.data[itr + 2],  bmp.data[itr + 3]];
