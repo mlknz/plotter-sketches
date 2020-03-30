@@ -1,5 +1,10 @@
 // canvas-sketch sketch-lips.js --open --output=export/
 
+// todo:
+// 1. cut segments with lips mask
+// 2. remove bottom edge
+// 3. liquid stekanie
+
 //const clustering = require('density-clustering');
 //const convexHull = require('convex-hull');
 const canvasSketch = require('canvas-sketch');
@@ -19,14 +24,13 @@ const debug = {
 };
 const bmpSize = 256;
 const svgSize = 256;
-const randomPointsCountHand = 16666;
-const randomPointsCountLips = 40000;
+const randomPointsCountLips = 100000;
 
-const handMargin = 0.666;
-const margin = 4.4;
-const lipsOffset = [-0.7, 2.3];
+const handMargin = 0.366;
+const margin = 1.0;
+const lipsOffset = [-0.0, 0.0];
 
-const penThicknessCm = 0.01;
+const penThicknessCm = 0.03;
 
 let teethSVGSegments;
 loadsvg('img/lips/teeth_rough.svg', async(err, svg) => {
@@ -37,10 +41,6 @@ const sketch = async ({ width, height, units, render }) => {
 
   const image_lips_up = await load('img/lips/lips_up_details.png');
   const image_lips_down = await load('img/lips/lips_down_details.png');
-  const image_hand = await load('img/lips/hand_inverse.png');
-  const image_hand_lips_mask = await load('img/lips/hand_lips_mask.png');
-
-  const pointsRandomHand = generatePoints(randomPointsCountHand, width, height, handMargin);
   const pointsRandomLips = generatePoints(randomPointsCountLips, width, height, handMargin);
 
   var canvas = document.createElement('canvas');
@@ -55,31 +55,26 @@ const sketch = async ({ width, height, units, render }) => {
   tmpContext.clearRect(0, 0, bmpSize, bmpSize);
   tmpContext.drawImage(image_lips_down, 0, 0, bmpSize, bmpSize);
   const lips_down_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
-  tmpContext.clearRect(0, 0, bmpSize, bmpSize);
-  tmpContext.drawImage(image_hand, 0, 0, bmpSize, bmpSize);
-  const hand_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
-  tmpContext.clearRect(0, 0, bmpSize, bmpSize);
-  tmpContext.drawImage(image_hand_lips_mask, 0, 0, bmpSize, bmpSize);
-  const hand_lips_mask_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
 
-  const lipsUpMaskFunc = entry => pointInBMPMask(entry, width, height, margin, lips_up_bmp);
-  const lipsDownMaskFunc = entry => pointInBMPMask(entry, width, height, margin, lips_down_bmp);
+  const lipsUpMaskFunc = entry =>
+  {
+      return pointInBMPMask(entry, width, height, margin, lips_up_bmp)
+        || !pointInBMPMask(entry, width, height, margin, lips_down_bmp);
+  };
+  const lipsDownMaskFunc = entry =>
+  {
+      return !pointInBMPMask(entry, width, height, margin, lips_up_bmp);
+  };
+
   const lipsUpPolys = voronoiPolysFromPointsAndMask(pointsRandomLips, width, height, margin, lipsUpMaskFunc);
   const lipsDownPolys = voronoiPolysFromPointsAndMask(pointsRandomLips, width, height, margin, lipsDownMaskFunc);
 
-  const handMaskFunc = entry =>
-  {
-      return pointInBMPMask(entry, width, height, handMargin, hand_bmp)
-        || pointInBMPMask(entry, width, height, margin, hand_lips_mask_bmp, lipsOffset);
-  }
-  const handPolys = voronoiPolysFromPointsAndMask(pointsRandomHand, width, height, handMargin, handMaskFunc);
-
   const points = [];
   const lines = [];
-  addSegmentsFromPolys(lipsUpPolys.fullyInside, lines, lipsOffset, debug);
-  addSegmentsFromPolys(lipsDownPolys.fullyInside, lines, lipsOffset, debug);
-  addSegmentsFromPolys(handPolys.fullyOutside, lines, [0, 0], debug);
-  addSegmentsFromPolys(handPolys.partiallyInside, lines, [0, 0], debug);
+  addSegmentsFromPolys(lipsUpPolys.fullyOutside, lines, lipsOffset, debug);
+  addSegmentsFromPolys(lipsUpPolys.partiallyInside, lines, lipsOffset, debug);
+  addSegmentsFromPolys(lipsDownPolys.fullyOutside, lines, lipsOffset, debug);
+  addSegmentsFromPolys(lipsDownPolys.partiallyInside, lines, lipsOffset, debug);
   console.log("Remove duplicates ", debug.duplicateSegments, "of total ", lines.length + debug.duplicateSegments);
 
   const mapSegCoords = (seg, offset) => {
@@ -138,7 +133,7 @@ return ({ context }) => {
   };
 };
 canvasSketch(sketch, {
-  dimensions: [ 13, 13 ],
+  dimensions: [ 12, 12 ],
   pixelsPerInch: 300,
   units: 'cm',
 });
