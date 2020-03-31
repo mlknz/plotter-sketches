@@ -24,7 +24,7 @@ const debug = {
 };
 const bmpSize = 256;
 const svgSize = 256;
-const randomPointsCountLips = 100000;
+const randomPointsCountLips = 66666;
 
 const handMargin = 0.366;
 const margin = 1.0;
@@ -39,8 +39,8 @@ loadsvg('img/lips/teeth_rough.svg', async(err, svg) => {
 
 const sketch = async ({ width, height, units, render }) => {
 
-  const image_lips_up = await load('img/lips/lips_up_details.png');
-  const image_lips_down = await load('img/lips/lips_down_details.png');
+  const image_lips_up = await load('img/lips/lips_up.png');
+  const image_lips_down = await load('img/lips/lips_down.png');
   const pointsRandomLips = generatePoints(randomPointsCountLips, width, height, handMargin);
 
   var canvas = document.createElement('canvas');
