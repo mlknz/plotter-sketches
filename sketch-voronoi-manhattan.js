@@ -15,7 +15,7 @@ import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
 
 // working L1 voronoi gen is currently in https://github.com/mlknz/manhattan-voronoi (fix_points_nudge branch)
 // use manhattan-voronoi npm module after fix merge
-import { generateL1Voronoi } from "C:/libs/manhattan-voronoi/src/voronoi.js";
+import { generateL1Voronoi } from "C:\\libs\\manhattan-voronoi\\src\\voronoi.js";
 
 const debug = {
     drawPoints: false,
@@ -23,27 +23,41 @@ const debug = {
 };
 const bmpSize = 256;
 const svgSize = 256;
-const randomPointsCount = 1000;
-
-const margin = 0.5;
-
 const penThicknessCm = 0.01;
+
+const randomPointsCount = 1000;
+const margin = 0.5;
 
 // let teethSVGSegments;
 // loadsvg('img/lips/teeth_rough.svg', async(err, svg) => {
 //   teethSVGSegments = await segments(await linearize(svg, { tolerance: 0 }));
 // });
 
+const generateManhattanVoronoi = (width, height) => {
+    const randomPoints = generatePoints(randomPointsCount, width, height, margin);
+    const manhattan = generateL1Voronoi(randomPoints, width, height, true);
+
+    const manhattanStripped = [];
+    for (let i = 0; i < manhattan.length; ++i)
+    {
+        manhattanStripped[i] = manhattan[i].polygonPoints;
+    }
+
+    // const str = JSON.stringify(manhattanStripped); console.log(str);
+    // const manhattan = JSON.parse(manhattanVoronoi1000);
+    return manhattanStripped;
+}
+
 const sketch = async ({ width, height, units, render }) => {
 
-  // const image_lips_up = await load('img/lips/lips_up.png');
-  // const image_lips_down = await load('img/lips/lips_down.png');
-  const randomPoints = generatePoints(randomPointsCount, width, height, margin);
+  const manh = generateManhattanVoronoi(width, height);
 
   var canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
 
+  // const image_lips_up = await load('img/lips/lips_up.png');
+  // const image_lips_down = await load('img/lips/lips_down.png');
   // var tmpContext = canvas.getContext('2d');
   // tmpContext.imageSmoothingEnabled = false;
   // tmpContext.clearRect(0, 0, bmpSize, bmpSize);
@@ -66,18 +80,15 @@ const sketch = async ({ width, height, units, render }) => {
   //const lipsUpPolys = voronoiPolysFromPointsAndMask(pointsRandomLips, width, height, margin, lipsUpMaskFunc);
   //const lipsDownPolys = voronoiPolysFromPointsAndMask(pointsRandomLips, width, height, margin, lipsDownMaskFunc);
 
-  let manhattan = generateL1Voronoi(randomPoints, width, height, true);
-  console.log('manh', manhattan);
-  const points = [[4,6], [3,10], [10,6], [1,2]];
   const lines = [];
-  for (let i = 0; i < manhattan.length; ++i)
+  for (let i = 0; i < manh.length; ++i)
   {
-      const site = manhattan[i];
-      for (let j = 0; j < site.polygonPoints.length; ++j)
+      const polygonPoints = manh[i];
+      for (let j = 0; j < polygonPoints.length; ++j)
       {
-            const jNext = (j + 1) % site.polygonPoints.length;
-            const p1 = site.polygonPoints[j];
-            const p2 = site.polygonPoints[jNext];
+            const jNext = (j + 1) % polygonPoints.length;
+            const p1 = polygonPoints[j];
+            const p2 = polygonPoints[jNext];
             lines.push([p1, p2]);
       }
   }
