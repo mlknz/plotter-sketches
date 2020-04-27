@@ -25,13 +25,10 @@ const bmpSize = 256;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 1000;
+const randomPointsCount = 100;
 const margin = 0.5;
-
-// let teethSVGSegments;
-// loadsvg('img/lips/teeth_rough.svg', async(err, svg) => {
-//   teethSVGSegments = await segments(await linearize(svg, { tolerance: 0 }));
-// });
+const lines = [];
+const points = [];
 
 const generateManhattanVoronoi = (width, height) => {
     const randomPoints = generatePoints(randomPointsCount, width, height, margin);
@@ -46,77 +43,67 @@ const generateManhattanVoronoi = (width, height) => {
     // const str = JSON.stringify(manhattanStripped); console.log(str);
     // const manhattan = JSON.parse(manhattanVoronoi1000);
     return manhattanStripped;
-}
+};
+
+const fillManhRegularCellEdges = (manh) => {
+    for (let i = 0; i < manh.length; ++i)
+    {
+        const polygonPoints = manh[i];
+        for (let j = 0; j < polygonPoints.length; ++j)
+        {
+              const jNext = (j + 1) % polygonPoints.length;
+              const p1 = polygonPoints[j];
+              const p2 = polygonPoints[jNext];
+              lines.push([p1, p2]);
+        }
+    }
+};
+
+const hasPoint = (points, p) => {
+    for (let j = 0; j < points.length; ++j)
+    {
+        const dx = p[0] - points[j][0];
+        const dy = p[1] - points[j][1];
+        //console.log(dx, dy);
+        if (Math.abs(dx*dx + dy*dy) < 0.00000001)
+        {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+const fillManhNodesPoints = (manh) => {
+    for (let i = 0; i < manh.length; ++i)
+    {
+        const polygonPoints = manh[i];
+        for (let j = 0; j < polygonPoints.length; ++j)
+        {
+            let isCloseToOther = false;
+            for (let k = 0; k < points.length; ++k)
+            {
+                const dx = polygonPoints[j][0] - points[k][0];
+                const dy = polygonPoints[j][1] - points[k][1];
+                if (Math.abs(dx*dx + dy*dy) < 0.05)
+                {
+                    isCloseToOther = true;
+                }
+            }
+            if (!isCloseToOther) points.push(polygonPoints[j]);
+        }
+    }
+};
 
 const sketch = async ({ width, height, units, render }) => {
 
   const manh = generateManhattanVoronoi(width, height);
+  fillManhRegularCellEdges(manh);
+  fillManhNodesPoints(manh);
 
-  var canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-
-  // const image_lips_up = await load('img/lips/lips_up.png');
-  // const image_lips_down = await load('img/lips/lips_down.png');
-  // var tmpContext = canvas.getContext('2d');
-  // tmpContext.imageSmoothingEnabled = false;
-  // tmpContext.clearRect(0, 0, bmpSize, bmpSize);
-  // tmpContext.drawImage(image_lips_up, 0, 0, bmpSize, bmpSize);
-  // const lips_up_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
-  // tmpContext.clearRect(0, 0, bmpSize, bmpSize);
-  // tmpContext.drawImage(image_lips_down, 0, 0, bmpSize, bmpSize);
-  // const lips_down_bmp = tmpContext.getImageData(0, 0, bmpSize, bmpSize);
-  //
-  // const lipsUpMaskFunc = entry =>
-  // {
-  //     return pointInBMPMask(entry, width, height, margin, lips_up_bmp)
-  //       || !pointInBMPMask(entry, width, height, margin, lips_down_bmp);
-  // };
-  // const lipsDownMaskFunc = entry =>
-  // {
-  //     return !pointInBMPMask(entry, width, height, margin, lips_up_bmp);
-  // };
-
-  //const lipsUpPolys = voronoiPolysFromPointsAndMask(pointsRandomLips, width, height, margin, lipsUpMaskFunc);
-  //const lipsDownPolys = voronoiPolysFromPointsAndMask(pointsRandomLips, width, height, margin, lipsDownMaskFunc);
-
-  const lines = [];
-  for (let i = 0; i < manh.length; ++i)
-  {
-      const polygonPoints = manh[i];
-      for (let j = 0; j < polygonPoints.length; ++j)
-      {
-            const jNext = (j + 1) % polygonPoints.length;
-            const p1 = polygonPoints[j];
-            const p2 = polygonPoints[jNext];
-            lines.push([p1, p2]);
-      }
-  }
-
-  //addSegmentsFromPolys(lipsUpPolys.fullyOutside, lines, lipsOffset, debug);
-  //addSegmentsFromPolys(lipsUpPolys.partiallyInside, lines, lipsOffset, debug);
-  //addSegmentsFromPolys(lipsDownPolys.fullyOutside, lines, lipsOffset, debug);
-  //addSegmentsFromPolys(lipsDownPolys.partiallyInside, lines, lipsOffset, debug);
-  //console.log("Remove duplicates ", debug.duplicateSegments, "of total ", lines.length + debug.duplicateSegments);
-
-  // const mapSegCoords = (seg, offset) => {
-  //     const x = (seg[0] / svgSize) * (width - margin*2) + margin + offset[0];
-  //     const y = (seg[1] / svgSize) * (height - margin*2) + margin + offset[1];
-  //     return [x, y];
-  // }
-  //
-  // teethSVGSegments.forEach(seg => {
-  //     for (let i = 0; i < seg.length - 1; ++i)
-  //     {
-  //         lines.push([mapSegCoords(seg[i], lipsOffset), mapSegCoords(seg[i + 1], lipsOffset)]);
-  //     }
-  // });
-
-// const loop = setInterval(() => {
-//   const remaining = integrate();
-//   if (!remaining) return clearInterval(loop);
-//   render();
-// }, 33.3);
+  // 2. inner radius
+  // 3. remove overlapping
+  // 4. sort draw order for plotter
 
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
@@ -124,6 +111,14 @@ return ({ context }) => {
     context.fillRect(0, 0, width, height);
 
     //context.drawImage(svg_teeth, margin, margin, width - margin, height - margin);
+
+    points.forEach(p => {
+      context.beginPath();
+      context.arc(p[0], p[1], 0.03, 0, Math.PI * 2);
+      context.strokeStyle = 'black';
+      context.lineWidth = penThicknessCm ;
+      context.stroke();
+    });
 
     lines.forEach(points => {
       context.beginPath();
@@ -135,8 +130,10 @@ return ({ context }) => {
       context.stroke();
     });
 
+
+
     if (debug.drawPoints) {
-      points.forEach(p => {
+      debugPoints.forEach(p => {
         context.beginPath();
         context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
         context.strokeStyle = context.fillStyle = 'red';
