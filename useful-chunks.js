@@ -57,3 +57,5 @@
 //   if (!remaining) return clearInterval(loop);
 //   render();
 // }, 33.3);
+
+//context.drawImage(svg_teeth, margin, margin, width - margin, height - margin);

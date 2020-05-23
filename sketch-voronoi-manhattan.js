@@ -25,92 +25,122 @@ const bmpSize = 256;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 100;
+const randomPointsCount = 20;
 const margin = 0.5;
+const innerCellRadiusMargin = 0.15;
 const lines = [];
 const points = [];
+
+const manhDist = (a, b) => {
+    return Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+};
 
 const generateManhattanVoronoi = (width, height) => {
     const randomPoints = generatePoints(randomPointsCount, width, height, margin);
     const manhattan = generateL1Voronoi(randomPoints, width, height, true);
 
-    const manhattanStripped = [];
-    for (let i = 0; i < manhattan.length; ++i)
+    manhattan.forEach(mi =>
     {
-        manhattanStripped[i] = manhattan[i].polygonPoints;
-    }
+        const manhFilteredPolygonPoints = mi.polygonPoints.filter((item, index) => mi.polygonPoints.indexOf(item) == index);
+        mi.polygonPoints = manhFilteredPolygonPoints;
+    })
 
-    // const str = JSON.stringify(manhattanStripped); console.log(str);
-    // const manhattan = JSON.parse(manhattanVoronoi1000);
-    return manhattanStripped;
-};
-
-const fillManhRegularCellEdges = (manh) => {
-    for (let i = 0; i < manh.length; ++i)
-    {
-        const polygonPoints = manh[i];
-        for (let j = 0; j < polygonPoints.length; ++j)
-        {
-              const jNext = (j + 1) % polygonPoints.length;
-              const p1 = polygonPoints[j];
-              const p2 = polygonPoints[jNext];
-              lines.push([p1, p2]);
-        }
-    }
-};
-
-const hasPoint = (points, p) => {
-    for (let j = 0; j < points.length; ++j)
-    {
-        const dx = p[0] - points[j][0];
-        const dy = p[1] - points[j][1];
-        //console.log(dx, dy);
-        if (Math.abs(dx*dx + dy*dy) < 0.00000001)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return manhattan;
 };
 
 const fillManhNodesPoints = (manh) => {
-    for (let i = 0; i < manh.length; ++i)
-    {
-        const polygonPoints = manh[i];
-        for (let j = 0; j < polygonPoints.length; ++j)
-        {
+    manh.forEach(mi =>
+        mi.polygonPoints.forEach(pp => {
             let isCloseToOther = false;
             for (let k = 0; k < points.length; ++k)
             {
-                const dx = polygonPoints[j][0] - points[k][0];
-                const dy = polygonPoints[j][1] - points[k][1];
+                const dx = pp[0] - points[k][0];
+                const dy = pp[1] - points[k][1];
                 if (Math.abs(dx*dx + dy*dy) < 0.05)
                 {
                     isCloseToOther = true;
                 }
             }
-            if (!isCloseToOther) points.push(polygonPoints[j]);
-        }
+            if (!isCloseToOther) points.push(pp);
+        })
+    );
+};
+
+const addPolygonLines = (polygonPoints) => {
+    for (let j = 0; j < polygonPoints.length; ++j)
+    {
+          const jNext = (j + 1) % polygonPoints.length;
+          const p1 = polygonPoints[j];
+          const p2 = polygonPoints[jNext];
+          lines.push([p1, p2]);
     }
+};
+
+const normalizeManh = (d) => {
+    const l = Math.abs(d[0]) + Math.abs(d[1]);
+    return [d[0] / l, d[1] / l];
+};
+
+const normalize = (d) => {
+    const l = Math.sqrt(d[0]*d[0] + d[1]*d[1]);
+    return [d[0] / l, d[1] / l];
+};
+
+const findDiffDir = (a, b) => {
+    return normalize([b[0] - a[0], b[1] - a[1]]);
+};
+
+const findMedianDir = (a, b, c) => {
+    let ba = findDiffDir(b, a);
+    let bc = findDiffDir(b, c);
+
+    return normalize([ba[0] + bc[0], ba[1] + bc[1]]);
+};
+
+const fillManhCellsLines = (manh) => {
+    manh.forEach(mi => {
+        const innerPolyPoints = [];
+        for (let i = 0; i < mi.polygonPoints.length; ++i)
+        {
+              const j = (i + 1) % mi.polygonPoints.length;
+              const k = (i + 2) % mi.polygonPoints.length;
+              const a = mi.polygonPoints[i];
+              const b = mi.polygonPoints[j];
+              const c = mi.polygonPoints[k];
+              const abManhDist = manhDist(a, b);
+              const bcManhDist = manhDist(b, c);
+
+              const medianDir = findMedianDir(a, b, c);
+
+              const candidateNumberOne = [b[0] + medianDir[0] * innerCellRadiusMargin, b[1] + medianDir[1] * innerCellRadiusMargin];
+              const candidateNumberTwo = [b[0] - medianDir[0] * innerCellRadiusMargin, b[1] - medianDir[1] * innerCellRadiusMargin];
+
+              const manhDist1 = manhDist(mi.site, candidateNumberOne);
+              const manhDist2 = manhDist(mi.site, candidateNumberTwo);
+
+              const innerPoint = manhDist1 < manhDist2 ? candidateNumberOne : candidateNumberTwo;
+
+              innerPolyPoints.push(innerPoint);
+        }
+        addPolygonLines(mi.polygonPoints);
+        addPolygonLines(innerPolyPoints);
+    });
 };
 
 const sketch = async ({ width, height, units, render }) => {
 
   const manh = generateManhattanVoronoi(width, height);
-  fillManhRegularCellEdges(manh);
   fillManhNodesPoints(manh);
+  fillManhCellsLines(manh); // add shtrihovkas 45 to edge
 
-  // 2. inner radius
-  // 3. remove overlapping
+  // 2. point circles to lines
+  // 3. remove overlapping lines in edges
   // 4. sort draw order for plotter
 
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
-
-    //context.drawImage(svg_teeth, margin, margin, width - margin, height - margin);
 
     points.forEach(p => {
       context.beginPath();
