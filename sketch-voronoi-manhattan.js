@@ -27,7 +27,7 @@ const penThicknessCm = 0.01;
 
 const randomPointsCount = 20;
 const margin = 0.5;
-const innerCellRadiusMargin = 0.15;
+const innerCellRadiusMargin = 0.25;
 const lines = [];
 const points = [];
 
@@ -97,31 +97,42 @@ const findMedianDir = (a, b, c) => {
     return normalize([ba[0] + bc[0], ba[1] + bc[1]]);
 };
 
+const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) => {
+    const innerPolyPoints = [];
+    for (let i = 0; i < polyPoints.length; ++i)
+    {
+          const j = (i + 1) % polyPoints.length;
+          const k = (i + 2) % polyPoints.length;
+          const a = polyPoints[i];
+          const b = polyPoints[j];
+          const c = polyPoints[k];
+          const abManhDist = manhDist(a, b);
+          const bcManhDist = manhDist(b, c);
+
+          const medianDir = findMedianDir(a, b, c);
+          const bc = findDiffDir(b, c);
+
+          const cos = medianDir[0] * bc[0] + medianDir[1] * bc[1];
+          const sin = Math.sqrt(1.0 - cos*cos);
+          const _innerMargin = desiredInnerMargin / sin;
+
+          const candidateNumberOne = [b[0] + medianDir[0] * _innerMargin, b[1] + medianDir[1] * _innerMargin];
+          const candidateNumberTwo = [b[0] - medianDir[0] * _innerMargin, b[1] - medianDir[1] * _innerMargin];
+
+          const manhDist1 = manhDist(polyCenter, candidateNumberOne);
+          const manhDist2 = manhDist(polyCenter, candidateNumberTwo);
+
+          const innerPoint = manhDist1 < manhDist2 ? candidateNumberOne : candidateNumberTwo;
+
+          innerPolyPoints.push(innerPoint);
+    }
+    return innerPolyPoints;
+};
+
 const fillManhCellsLines = (manh) => {
     manh.forEach(mi => {
-        const innerPolyPoints = [];
-        for (let i = 0; i < mi.polygonPoints.length; ++i)
-        {
-              const j = (i + 1) % mi.polygonPoints.length;
-              const k = (i + 2) % mi.polygonPoints.length;
-              const a = mi.polygonPoints[i];
-              const b = mi.polygonPoints[j];
-              const c = mi.polygonPoints[k];
-              const abManhDist = manhDist(a, b);
-              const bcManhDist = manhDist(b, c);
+        const innerPolyPoints = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin); // mewmew remove loops
 
-              const medianDir = findMedianDir(a, b, c);
-
-              const candidateNumberOne = [b[0] + medianDir[0] * innerCellRadiusMargin, b[1] + medianDir[1] * innerCellRadiusMargin];
-              const candidateNumberTwo = [b[0] - medianDir[0] * innerCellRadiusMargin, b[1] - medianDir[1] * innerCellRadiusMargin];
-
-              const manhDist1 = manhDist(mi.site, candidateNumberOne);
-              const manhDist2 = manhDist(mi.site, candidateNumberTwo);
-
-              const innerPoint = manhDist1 < manhDist2 ? candidateNumberOne : candidateNumberTwo;
-
-              innerPolyPoints.push(innerPoint);
-        }
         addPolygonLines(mi.polygonPoints);
         addPolygonLines(innerPolyPoints);
     });
