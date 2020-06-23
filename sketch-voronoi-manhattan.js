@@ -25,9 +25,9 @@ const bmpSize = 256;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 150;
+const randomPointsCount = 50;
 const margin = 0.5;
-const innerCellRadiusMargin = 0.125;
+const innerCellRadiusMargin = 0.325;
 const lines = [];
 const points = [];
 
@@ -115,23 +115,18 @@ const cross2d = (v, w) => {
 
 const intersectEdges = (a, b) => {
     const a0x = a[0][0];
-    const a1x = a[1][0];
     const a0y = a[0][1];
+    const a1x = a[1][0];
     const a1y = a[1][1];
     const b0x = b[0][0];
-    const b1x = b[1][0];
     const b0y = b[0][1];
+    const b1x = b[1][0];
     const b1y = b[1][1];
 
-    const aMinX = Math.min(a0x, a1x);
-    const aMaxX = Math.max(a0x, a1x);
-    const aMinY = Math.min(a0y, a1y);
-    const aMaxY = Math.max(a0y, a1y);
-    const bMinX = Math.min(b0x, b1x);
-    const bMaxX = Math.max(b0x, b1x);
-    const bMinY = Math.min(b0y, b1y);
-    const bMaxY = Math.max(b0y, b1y);
-    if (aMaxX <= bMinX || aMinX >= bMaxX || aMaxY <= bMinY || aMinY >= bMaxY)
+    if (Math.max(a0x, a1x) <= Math.min(b0x, b1x)
+         || Math.min(a0x, a1x) >= Math.max(b0x, b1x)
+         || Math.max(a0y, a1y) <= Math.min(b0y, b1y)
+         || Math.min(a0y, a1y) >= Math.max(b0y, b1y))
     {
         return false;
     }
@@ -155,7 +150,23 @@ const intersectEdges = (a, b) => {
     return [a0x + aDirUnnorm[0] * t, a0y + aDirUnnorm[1] * t];
 };
 
-const fixSelfIntersections = (polyPoints) => {
+const doPolygonsIntersect = (polyOne, polyTwo) => {
+    for (let i = 0; i < polyOne.length; ++i)
+    {
+        for (let j = 0; j < polyTwo.length; ++j)
+        {
+            const edgeOne = [ polyOne[i], polyOne[(i+1)%polyOne.length] ];
+            const edgeTwo = [ polyTwo[j], polyTwo[(j+1)%polyTwo.length] ];
+            if (intersectEdges(edgeOne, edgeTwo))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+const splitPolySelfIntersections = (polyPoints, outPolygons) => {
     let i, j;
     let intersection = false;
     for (i = 2; i < polyPoints.length; ++i)
@@ -182,7 +193,11 @@ const fixSelfIntersections = (polyPoints) => {
             if (intersection) break;
         }
 
-        if (!intersection) return polyPoints;
+        if (!intersection)
+        {
+            outPolygons.push(polyPoints);
+            return;
+        }
     }
 
     const polyA = [];
@@ -206,12 +221,8 @@ const fixSelfIntersections = (polyPoints) => {
         polyB.push(polyPoints[k]);
     }
 
-
-    if (manhPerimeter(polyA) > manhPerimeter(polyB))
-    {
-        return fixSelfIntersections(polyA);
-    }
-    return fixSelfIntersections(polyB);
+    splitPolySelfIntersections(polyA, outPolygons);
+    splitPolySelfIntersections(polyB, outPolygons);
 };
 
 const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) => {
@@ -244,19 +255,33 @@ const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) =>
           innerPolyPoints.push(innerPoint);
     }
 
-    const result = fixSelfIntersections(innerPolyPoints);
-    // todo: mewmew remove if intersects some poly
-    return result;
+    const innerPolygons = [];
+    splitPolySelfIntersections(innerPolyPoints, innerPolygons);
+
+    if (innerPolygons.length == 0)
+    {
+        return [];
+    }
+    innerPolygons.sort((polyA, polyB) => { return -(manhPerimeter(polyA) - manhPerimeter(polyB)); })
+    for (let i = 0; i < innerPolygons.length; ++i)
+    {
+        if (!doPolygonsIntersect(innerPolygons[i], polyPoints))
+        {
+            return innerPolygons[i];
+        }
+    }
+
+    return [];
 };
 
 const fillManhCellsLines = (manh) => {
     manh.forEach(mi => {
         const innerPolyPoints = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin);
-        //const innerPolyPoints2 = generateInnerCellContour(innerPolyPoints, mi.site, innerCellRadiusMargin);
+        const innerPolyPoints2 = generateInnerCellContour(innerPolyPoints, mi.site, innerCellRadiusMargin);
 
         addPolygonLines(mi.polygonPoints);
         addPolygonLines(innerPolyPoints);
-        //addPolygonLines(innerPolyPoints2); // todo: improve. correct fake site pos?
+        // addPolygonLines(innerPolyPoints2); // todo: improve. correct fake site pos?
         // add shtrihovkas 45 to edge
     });
 };
