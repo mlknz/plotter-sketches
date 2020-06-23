@@ -25,9 +25,9 @@ const bmpSize = 256;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 20;
+const randomPointsCount = 150;
 const margin = 0.5;
-const innerCellRadiusMargin = 0.25;
+const innerCellRadiusMargin = 0.125;
 const lines = [];
 const points = [];
 
@@ -165,20 +165,24 @@ const fixSelfIntersections = (polyPoints) => {
             const edgeA = [polyPoints[i - 1], polyPoints[i]];
             const edgeB = [polyPoints[j - 1], polyPoints[j]];
             intersection = intersectEdges(edgeA, edgeB);
-            if (intersection)
-            {
-                break;
-            }
+
+            if (intersection) break;
         }
-        if (intersection)
-        {
-            break;
-        }
+        if (intersection) break;
     }
 
     if (!intersection)
     {
-        return polyPoints;
+        i = 0;
+        const edgeA = [polyPoints[0], polyPoints[polyPoints.length - 1]];
+        for (j = 2; j < polyPoints.length - 1; ++j)
+        {
+            const edgeB = [polyPoints[j - 1], polyPoints[j]];
+            intersection = intersectEdges(edgeA, edgeB);
+            if (intersection) break;
+        }
+
+        if (!intersection) return polyPoints;
     }
 
     const polyA = [];
@@ -187,16 +191,21 @@ const fixSelfIntersections = (polyPoints) => {
         polyA.push(polyPoints[k]);
     }
     polyA.push(intersection);
-    for (let k = i; k < polyPoints.length; ++k)
+    if (i > 0)
     {
-        polyA.push(polyPoints[k]);
+        for (let k = i; k < polyPoints.length; ++k)
+        {
+            polyA.push(polyPoints[k]);
+        }
     }
 
     const polyB = [ intersection ];
+    if (i < j) i = polyPoints.length;
     for (let k = j; k < i; ++k)
     {
         polyB.push(polyPoints[k]);
     }
+
 
     if (manhPerimeter(polyA) > manhPerimeter(polyB))
     {
@@ -235,17 +244,19 @@ const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) =>
           innerPolyPoints.push(innerPoint);
     }
 
-    return fixSelfIntersections(innerPolyPoints);
+    const result = fixSelfIntersections(innerPolyPoints);
+    // todo: mewmew remove if intersects some poly
+    return result;
 };
 
 const fillManhCellsLines = (manh) => {
     manh.forEach(mi => {
         const innerPolyPoints = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin);
-        const innerPolyPoints2 = generateInnerCellContour(innerPolyPoints, mi.site, innerCellRadiusMargin);
+        //const innerPolyPoints2 = generateInnerCellContour(innerPolyPoints, mi.site, innerCellRadiusMargin);
 
         addPolygonLines(mi.polygonPoints);
         addPolygonLines(innerPolyPoints);
-        //addPolygonLines(innerPolyPoints2);
+        //addPolygonLines(innerPolyPoints2); // todo: improve. correct fake site pos?
         // add shtrihovkas 45 to edge
     });
 };
