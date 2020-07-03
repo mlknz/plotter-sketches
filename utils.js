@@ -54,5 +54,5 @@ export function pointInBMPMask(p, width, height, margin, bmp_mask, offset = [0, 
     if (cellX < 0 || cellY < 0 || cellX > bmp_mask.width || cellY > bmp_mask.height) return false;
 
     const col = getBMPColor(bmp_mask, cellX, cellY);
-    return col[3] > 128;
+    return col[0] > 128;
 };

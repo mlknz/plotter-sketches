@@ -21,13 +21,14 @@ const debug = {
     drawPoints: false,
     duplicateSegments: 0
 };
-const bmpSize = 256;
+const img_size = 512;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 50;
+const randomPointsCount = 130;
 const margin = 0.5;
-const innerCellRadiusMargin = 0.325;
+const eye_outer_margin = 1.0;
+const innerCellRadiusMargin = 0.125;
 const lines = [];
 const points = [];
 
@@ -225,7 +226,7 @@ const splitPolySelfIntersections = (polyPoints, outPolygons) => {
     splitPolySelfIntersections(polyB, outPolygons);
 };
 
-const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) => {
+const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin, polysToTestIntersection) => {
     const innerPolyPoints = [];
     for (let i = 0; i < polyPoints.length; ++i)
     {
@@ -265,7 +266,9 @@ const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) =>
     innerPolygons.sort((polyA, polyB) => { return -(manhPerimeter(polyA) - manhPerimeter(polyB)); })
     for (let i = 0; i < innerPolygons.length; ++i)
     {
-        if (!doPolygonsIntersect(innerPolygons[i], polyPoints))
+        let intersectsSomeShit = false;
+        polysToTestIntersection.forEach(poly => intersectsSomeShit |= doPolygonsIntersect(innerPolygons[i], poly));
+        if (!intersectsSomeShit)
         {
             return innerPolygons[i];
         }
@@ -276,21 +279,51 @@ const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin) =>
 
 const fillManhCellsLines = (manh) => {
     manh.forEach(mi => {
-        const innerPolyPoints = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin);
-        const innerPolyPoints2 = generateInnerCellContour(innerPolyPoints, mi.site, innerCellRadiusMargin);
+        const innerPoly = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin, [ mi.polygonPoints ]);
+        const innerPoly2 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 2, [ mi.polygonPoints, innerPoly ]);
+        const innerPoly3 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 3, [ mi.polygonPoints, innerPoly, innerPoly2 ]);
 
         addPolygonLines(mi.polygonPoints);
-        addPolygonLines(innerPolyPoints);
-        // addPolygonLines(innerPolyPoints2); // todo: improve. correct fake site pos?
-        // add shtrihovkas 45 to edge
+        addPolygonLines(innerPoly);
+        addPolygonLines(innerPoly2);
+        addPolygonLines(innerPoly3);
     });
 };
 
 const sketch = async ({ width, height, units, render }) => {
 
-  const manh = generateManhattanVoronoi(width, height);
-  fillManhNodesPoints(manh);
-  fillManhCellsLines(manh);
+    const img_eye_base = await load('assets/eye_base.png');
+    const canvas = document.createElement('canvas');
+    canvas.width = img_size;
+    canvas.height = img_size;
+    const tmpContext = canvas.getContext('2d');
+    tmpContext.imageSmoothingEnabled = false;
+    tmpContext.clearRect(0, 0, img_size, img_size);
+    tmpContext.drawImage(img_eye_base, 0, 0, img_size, img_size);
+    const eye_base_bmp = tmpContext.getImageData(0, 0, img_size, img_size);
+    console.log(eye_base_bmp);
+
+    const manh = generateManhattanVoronoi(width, height);
+    fillManhNodesPoints(manh);
+    fillManhCellsLines(manh);
+    const linesEyeCut = [];
+    for (let i = 0; i < lines.length; ++i)
+    {
+        let pointsInMask = 0;
+        if (pointInBMPMask(lines[i][0], width, height, eye_outer_margin, eye_base_bmp))
+        {
+            pointsInMask++;
+        }
+        if (pointInBMPMask(lines[i][1], width, height, eye_outer_margin, eye_base_bmp))
+        {
+            pointsInMask++;
+        }
+        if (pointsInMask == 0)
+        {
+            linesEyeCut.push(lines[i]);
+        }
+    }
+    const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp));
 
   // 2. point circles to lines
   // 3. robust draw order for plotter
@@ -300,7 +333,7 @@ return ({ context }) => {
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
 
-    points.forEach(p => {
+    pointsEyeCut.forEach(p => {
       context.beginPath();
       context.arc(p[0], p[1], 0.03, 0, Math.PI * 2);
       context.strokeStyle = 'black';
@@ -308,9 +341,9 @@ return ({ context }) => {
       context.stroke();
     });
 
-    lines.forEach(points => {
+    linesEyeCut.forEach(line => {
       context.beginPath();
-      points.forEach(p => context.lineTo(p[0], p[1]));
+      line.forEach(p => context.lineTo(p[0], p[1]));
       context.strokeStyle = 'black';
       context.lineWidth = penThicknessCm;
       context.lineJoin = 'round';
@@ -331,7 +364,7 @@ return ({ context }) => {
     return [
       context.canvas,
       {
-        data: polylinesToSVG(lines, { width, height, units } ),
+        data: polylinesToSVG(linesEyeCut, { width, height, units } ),
         extension: '.svg'
       }
     ];
