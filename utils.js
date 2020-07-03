@@ -49,10 +49,10 @@ export function getBMPColor(bmp, x, y) {
 };
 
 export function pointInBMPMask(p, width, height, margin, bmp_mask, offset = [0, 0]) {
-    const cellX = Math.floor(((p[0] - offset[0] - margin) / (width - 2*margin)) * bmp_mask.width);
+    const cellX =  Math.floor(((p[0] - offset[0] - margin) / (width - 2*margin)) * bmp_mask.width);
     const cellY = Math.floor(((p[1] - offset[1] - margin) / (height - 2*margin)) * bmp_mask.height);
     if (cellX < 0 || cellY < 0 || cellX > bmp_mask.width || cellY > bmp_mask.height) return false;
 
     const col = getBMPColor(bmp_mask, cellX, cellY);
-    return col[0] > 128;
+    return col[0] > 128 || col[1] > 128;
 };

@@ -290,6 +290,12 @@ const fillManhCellsLines = (manh) => {
     });
 };
 
+let eye_contour_svg;
+loadsvg('assets/eye_contour.svg', async(err, svg) => {
+  eye_contour_svg = await segments(await linearize(svg, { tolerance: 0 }));
+});
+
+
 const sketch = async ({ width, height, units, render }) => {
 
     const img_eye_base = await load('assets/eye_base.png');
@@ -325,8 +331,18 @@ const sketch = async ({ width, height, units, render }) => {
     }
     const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp));
 
+    const mapSegCoords = (seg, offset) => {
+        const x = (seg[0] / img_size) * (width - eye_outer_margin*2) + eye_outer_margin + offset[0];
+        const y = (seg[1] / img_size) * (height - eye_outer_margin*2) + eye_outer_margin + offset[1];
+        return [x, y];
+    }
+    eye_contour_svg.forEach(seg => {
+        for (let i = 0; i < seg.length; ++i)
+        {
+            linesEyeCut.push([mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])]);
+        }
+    });
   // 2. point circles to lines
-  // 3. robust draw order for plotter
 
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
