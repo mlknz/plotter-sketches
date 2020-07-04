@@ -43,6 +43,7 @@ export function addSegmentsFromPolys(polys, lines, offset, debug)
     });
 }
 
+// IMG
 export function getBMPColor(bmp, x, y) {
     let itr = y * bmp.width * 4 + x * 4;
     return [bmp.data[itr], bmp.data[itr + 1],  bmp.data[itr + 2],  bmp.data[itr + 3]];
@@ -55,4 +56,62 @@ export function pointInBMPMask(p, width, height, margin, bmp_mask, offset = [0, 
 
     const col = getBMPColor(bmp_mask, cellX, cellY);
     return col[0] > 128 || col[1] > 128;
+};
+
+// 2d
+export function normalize(d) {
+    const l = Math.sqrt(d[0]*d[0] + d[1]*d[1]);
+    return [d[0] / l, d[1] / l];
+};
+
+export function directionFromTo(a, b) {
+    return normalize([b[0] - a[0], b[1] - a[1]]);
+};
+
+export function findMedianDir(a, b, c) {
+    let ba = directionFromTo(b, a);
+    let bc = directionFromTo(b, c);
+
+    return normalize([ba[0] + bc[0], ba[1] + bc[1]]);
+};
+
+export function cross2d(v, w) {
+    return v[0] * w[1] - v[1] * w[0];
+};
+
+export function intersectEdges(a, b) {
+    const a0x = a[0][0];
+    const a0y = a[0][1];
+    const a1x = a[1][0];
+    const a1y = a[1][1];
+    const b0x = b[0][0];
+    const b0y = b[0][1];
+    const b1x = b[1][0];
+    const b1y = b[1][1];
+
+    if (Math.max(a0x, a1x) <= Math.min(b0x, b1x)
+         || Math.min(a0x, a1x) >= Math.max(b0x, b1x)
+         || Math.max(a0y, a1y) <= Math.min(b0y, b1y)
+         || Math.min(a0y, a1y) >= Math.max(b0y, b1y))
+    {
+        return false;
+    }
+    const aDir = directionFromTo(a[0], a[1]);
+    const bDir = directionFromTo(b[0], b[1]);
+
+    const abDot = aDir[0] * bDir[0] + aDir[1] * bDir[1];
+    if (Math.abs(abDot) > 0.999)
+    {
+        return false;
+    }
+
+    const aDirUnnorm = [a1x - a0x, a1y - a0y];
+    const bDirUnnorm = [b1x - b0x, b1y - b0y];
+    const t = cross2d([b0x - a0x, b0y - a0y], bDirUnnorm) / cross2d(aDirUnnorm, bDirUnnorm);
+    const u = cross2d([a0x - b0x, a0y - b0y], aDirUnnorm) / cross2d(bDirUnnorm, aDirUnnorm);
+    if (isNaN(t) || isNaN(u) || t < 0 || t > 1 || u < 0 || u > 1)
+    {
+        return false;
+    }
+    return [a0x + aDirUnnorm[0] * t, a0y + aDirUnnorm[1] * t];
 };
