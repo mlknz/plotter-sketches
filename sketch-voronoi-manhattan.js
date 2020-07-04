@@ -313,24 +313,7 @@ const sketch = async ({ width, height, units, render }) => {
     fillManhNodesPoints(manh);
     fillManhCellsLines(manh);
     const linesEyeCut = [];
-    for (let i = 0; i < lines.length; ++i)
-    {
-        let pointsInMask = 0;
-        if (pointInBMPMask(lines[i][0], width, height, eye_outer_margin, eye_base_bmp))
-        {
-            pointsInMask++;
-        }
-        if (pointInBMPMask(lines[i][1], width, height, eye_outer_margin, eye_base_bmp))
-        {
-            pointsInMask++;
-        }
-        if (pointsInMask == 0)
-        {
-            linesEyeCut.push(lines[i]);
-        }
-    }
-    const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp));
-
+    const eye_base_contour = [];
     const mapSegCoords = (seg, offset) => {
         const x = (seg[0] / img_size) * (width - eye_outer_margin*2) + eye_outer_margin + offset[0];
         const y = (seg[1] / img_size) * (height - eye_outer_margin*2) + eye_outer_margin + offset[1];
@@ -339,9 +322,37 @@ const sketch = async ({ width, height, units, render }) => {
     eye_contour_svg.forEach(seg => {
         for (let i = 0; i < seg.length; ++i)
         {
-            linesEyeCut.push([mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])]);
+            const contourLine = [mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])];
+            linesEyeCut.push(contourLine);
+            eye_base_contour.push(contourLine);
         }
     });
+
+    for (let i = 0; i < lines.length; ++i)
+    {
+        let intersection = false;
+        for (let j = 0; j < eye_base_contour.length; ++j)
+        {
+            intersection = intersectEdges(lines[i], eye_base_contour[j]);
+            if (intersection) break;
+        }
+
+        const p0InMask = pointInBMPMask(lines[i][0], width, height, eye_outer_margin, eye_base_bmp);
+        const p1InMask = pointInBMPMask(lines[i][1], width, height, eye_outer_margin, eye_base_bmp);
+
+        if (!p0InMask && !p1InMask && !intersection)
+        {
+            linesEyeCut.push(lines[i]);
+        }
+        else if (intersection)
+        {
+            if (!p0InMask && p1InMask) linesEyeCut.push([lines[i][0], intersection]);
+            else if (!p1InMask && p0InMask) linesEyeCut.push([lines[i][1], intersection]);
+        }
+    }
+    const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp));
+
+
   // 2. point circles to lines
 
 return ({ context }) => {
