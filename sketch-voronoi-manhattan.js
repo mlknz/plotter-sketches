@@ -12,7 +12,7 @@ const linearize = require('svg-linearize');
 const { polylinesToSVG } = require('canvas-sketch-util/penplot');
 import { generatePoints, segmentsEqual, pointsEqual, addSegmentsFromPolys,
    getBMPColor, pointInBMPMask, findMedianDir, directionFromTo, intersectEdges } from "./utils.js";
-// import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
+import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
 import { fillManhNodesPoints, fillManhCellsLines } from "./utils-manh-voronoi.js";
 
 // working L1 voronoi gen is currently in https://github.com/mlknz/manhattan-voronoi (fix_points_nudge branch)
@@ -28,8 +28,9 @@ const svgSize = 256;
 const penThicknessCm = 0.01;
 
 const randomPointsCount = 130;
+const irisVoroGenPointsCount = 45000;
 const margin = 0.5;
-const eye_outer_margin = 1.0;
+const eye_outer_margin = 0.5;
 const innerCellRadiusMargin = 0.125;
 const lines = [];
 const points = [];
@@ -43,10 +44,42 @@ const generateManhattanVoronoi = (width, height) => {
         const manhFilteredPolygonPoints = mi.polygonPoints.filter((item, index) => mi.polygonPoints.indexOf(item) == index);
         mi.polygonPoints = manhFilteredPolygonPoints;
     })
-
     return manhattan;
 };
 
+const generateIrisVoronoi = (width, height, bmpMask) => {
+    const randomPoints = generatePoints(irisVoroGenPointsCount, width, height, margin);
+    const irisMaskFunc = entry => pointInBMPMask(entry, width, height, margin, bmpMask, [0]);
+
+    const irisPolys = voronoiPolysFromPointsAndMask(randomPoints, width, height, margin, irisMaskFunc);
+
+    return irisPolys;
+};
+
+const addLinesCutWithContourAndMask = (linesToCut, contourLines, maskFunc) => {
+    for (let i = 0; i < linesToCut.length; ++i)
+    {
+        let intersection = false;
+        for (let j = 0; j < contourLines.length; ++j)
+        {
+            intersection = intersectEdges(linesToCut[i], contourLines[j]);
+            if (intersection) break;
+        }
+
+        const p0InMask = maskFunc(linesToCut[i][0]);
+        const p1InMask = maskFunc(linesToCut[i][1]);
+
+        if (!p0InMask && !p1InMask && !intersection)
+        {
+            lines.push(linesToCut[i]);
+        }
+        else if (intersection)
+        {
+            if (!p0InMask && p1InMask) lines.push([linesToCut[i][0], intersection]);
+            else if (!p1InMask && p0InMask) lines.push([linesToCut[i][1], intersection]);
+        }
+    }
+};
 
 let eye_contour_svg;
 loadsvg('assets/eye_contour.svg', async(err, svg) => {
@@ -65,12 +98,12 @@ const sketch = async ({ width, height, units, render }) => {
     tmpContext.clearRect(0, 0, img_size, img_size);
     tmpContext.drawImage(img_eye_base, 0, 0, img_size, img_size);
     const eye_base_bmp = tmpContext.getImageData(0, 0, img_size, img_size);
-    console.log(eye_base_bmp);
 
-    const manh = generateManhattanVoronoi(width, height);
-    fillManhNodesPoints(manh, points);
-    fillManhCellsLines(manh, innerCellRadiusMargin, lines);
-    const linesEyeCut = [];
+    const img_eye_iris = await load('assets/eye_iris.png');
+    tmpContext.clearRect(0, 0, img_size, img_size);
+    tmpContext.drawImage(img_eye_iris, 0, 0, img_size, img_size);
+    const eye_iris_bmp = tmpContext.getImageData(0, 0, img_size, img_size);
+
     const eye_base_contour = [];
     const mapSegCoords = (seg, offset) => {
         const x = (seg[0] / img_size) * (width - eye_outer_margin*2) + eye_outer_margin + offset[0];
@@ -81,34 +114,29 @@ const sketch = async ({ width, height, units, render }) => {
         for (let i = 0; i < seg.length; ++i)
         {
             const contourLine = [mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])];
-            linesEyeCut.push(contourLine);
+            lines.push(contourLine);
             eye_base_contour.push(contourLine);
         }
     });
 
-    for (let i = 0; i < lines.length; ++i)
-    {
-        let intersection = false;
-        for (let j = 0; j < eye_base_contour.length; ++j)
-        {
-            intersection = intersectEdges(lines[i], eye_base_contour[j]);
-            if (intersection) break;
-        }
+    const linesManh = [];
+    const manh = generateManhattanVoronoi(width, height);
+    fillManhNodesPoints(manh, points);
+    fillManhCellsLines(manh, innerCellRadiusMargin, linesManh);
+    const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1]);
+    addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc);
 
-        const p0InMask = pointInBMPMask(lines[i][0], width, height, eye_outer_margin, eye_base_bmp);
-        const p1InMask = pointInBMPMask(lines[i][1], width, height, eye_outer_margin, eye_base_bmp);
+    const linesIris = [];
+    const irisPolys = generateIrisVoronoi(width, height, eye_iris_bmp);
+    addSegmentsFromPolys(irisPolys.partiallyInside, linesIris, [0, 0], debug);
+    addSegmentsFromPolys(irisPolys.fullyOutside, linesIris, [0, 0], debug);
+    const irisMaskFunc = point => !pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [2]);
+    addLinesCutWithContourAndMask(linesIris, eye_base_contour, irisMaskFunc);
+    // linesIris.forEach(l => {
+    //     if (irisMaskFunc(l[0]) || irisMaskFunc(l[1])) lines.push(l);
+    // });
 
-        if (!p0InMask && !p1InMask && !intersection)
-        {
-            linesEyeCut.push(lines[i]);
-        }
-        else if (intersection)
-        {
-            if (!p0InMask && p1InMask) linesEyeCut.push([lines[i][0], intersection]);
-            else if (!p1InMask && p0InMask) linesEyeCut.push([lines[i][1], intersection]);
-        }
-    }
-    const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp));
+    const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
 
 
   // 2. point circles to lines
@@ -126,7 +154,7 @@ return ({ context }) => {
       context.stroke();
     });
 
-    linesEyeCut.forEach(line => {
+    lines.forEach(line => {
       context.beginPath();
       line.forEach(p => context.lineTo(p[0], p[1]));
       context.strokeStyle = 'black';
@@ -149,7 +177,7 @@ return ({ context }) => {
     return [
       context.canvas,
       {
-        data: polylinesToSVG(linesEyeCut, { width, height, units } ),
+        data: polylinesToSVG(lines, { width, height, units } ),
         extension: '.svg'
       }
     ];
