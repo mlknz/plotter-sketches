@@ -56,7 +56,7 @@ const generateIrisVoronoi = (width, height, bmpMask) => {
     return irisPolys;
 };
 
-const addLinesCutWithContourAndMask = (linesToCut, contourLines, maskFunc) => {
+const addLinesCutWithContourAndMask = (linesToCut, contourLines, maskFunc, linesOut) => {
     for (let i = 0; i < linesToCut.length; ++i)
     {
         let intersection = false;
@@ -71,14 +71,19 @@ const addLinesCutWithContourAndMask = (linesToCut, contourLines, maskFunc) => {
 
         if (!p0InMask && !p1InMask && !intersection)
         {
-            lines.push(linesToCut[i]);
+            linesOut.push(linesToCut[i]);
         }
         else if (intersection)
         {
-            if (!p0InMask && p1InMask) lines.push([linesToCut[i][0], intersection]);
-            else if (!p1InMask && p0InMask) lines.push([linesToCut[i][1], intersection]);
+            if (!p0InMask && p1InMask) linesOut.push([linesToCut[i][0], intersection]);
+            else if (!p1InMask && p0InMask) linesOut.push([linesToCut[i][1], intersection]);
         }
     }
+};
+
+const fancyIrisMaths = (linesIn, linesOut) =>
+{
+    linesIn.forEach(l => linesOut.push(l));
 };
 
 let eye_contour_svg;
@@ -119,22 +124,21 @@ const sketch = async ({ width, height, units, render }) => {
         }
     });
 
-    const linesManh = [];
-    const manh = generateManhattanVoronoi(width, height);
-    fillManhNodesPoints(manh, points);
-    fillManhCellsLines(manh, innerCellRadiusMargin, linesManh);
-    const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1]);
-    addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc);
+    // const linesManh = [];
+    // const manh = generateManhattanVoronoi(width, height);
+    // fillManhNodesPoints(manh, points);
+    // fillManhCellsLines(manh, innerCellRadiusMargin, linesManh);
+    // const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1]);
+    // addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
 
+    const linesIrisBase = [];
     const linesIris = [];
     const irisPolys = generateIrisVoronoi(width, height, eye_iris_bmp);
-    addSegmentsFromPolys(irisPolys.partiallyInside, linesIris, [0, 0], debug);
-    addSegmentsFromPolys(irisPolys.fullyOutside, linesIris, [0, 0], debug);
+    addSegmentsFromPolys(irisPolys.partiallyInside, linesIrisBase, [0, 0], debug);
+    addSegmentsFromPolys(irisPolys.fullyOutside, linesIrisBase, [0, 0], debug);
     const irisMaskFunc = point => !pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [2]);
-    addLinesCutWithContourAndMask(linesIris, eye_base_contour, irisMaskFunc);
-    // linesIris.forEach(l => {
-    //     if (irisMaskFunc(l[0]) || irisMaskFunc(l[1])) lines.push(l);
-    // });
+    addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
+    fancyIrisMaths(linesIris, lines);
 
     const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
 
