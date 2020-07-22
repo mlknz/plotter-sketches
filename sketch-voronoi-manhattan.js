@@ -81,9 +81,114 @@ const addLinesCutWithContourAndMask = (linesToCut, contourLines, maskFunc, lines
     }
 };
 
+const distSq = (a, b) =>
+{
+    const d = [a[0] - b[0], a[1] - b[1]];
+    return d[0]*d[0] + d[1]*d[1];
+}
+
+const dist = (a, b) =>
+{
+    return Math.sqrt(distSq(a, b));
+}
+
 const fancyIrisMaths = (linesIn, linesOut) =>
 {
-    linesIn.forEach(l => linesOut.push(l));
+    const allPoints = [];
+    let center = [0, 0];
+    linesIn.forEach(l => {
+        allPoints.push(l[0]);
+        allPoints.push(l[1]);
+        center[0] += l[0][0];
+        center[0] += l[1][0];
+        center[1] += l[0][1];
+        center[1] += l[1][1];
+    })
+    center[0] /= allPoints.length;
+    center[1] /= allPoints.length;
+
+    let maxRSq = 0;
+    let minRSq = 66666666.1;
+    allPoints.forEach(p => {
+        const d = distSq(p, center);
+        maxRSq = Math.max(maxRSq, d);
+        minRSq = Math.min(minRSq, d);
+    });
+
+    const rMax = Math.sqrt(maxRSq);
+    const rMin = Math.sqrt(minRSq);
+    const r = rMax - rMin;
+
+    let edgeCircleDist = 0;
+    let innerCirclePointsCount = 0;
+    linesIn.forEach(l => {
+        const d1 = dist(l[0], center) - rMin;
+        const d2 = dist(l[1], center) - rMin;
+        const minD = Math.min(d1, d2);
+        const maxD = Math.max(d1, d2);
+        const toCenter = directionFromTo(l[0], center);
+        const dir = directionFromTo(l[0], l[1]);
+        const isDirTangent = Math.abs(toCenter[0] * dir[0] + toCenter[1] * dir[1]) < 0.4;
+
+        if (isDirTangent && minD > r * 0.4 && maxD < r * 0.66)
+        {
+            edgeCircleDist += (d1 + d2);
+            innerCirclePointsCount += 2;
+        }
+    });
+    edgeCircleDist /= innerCirclePointsCount;
+    const distToEdge = edgeCircleDist + 0.0 * r;
+
+    linesIn.forEach(l => {
+        const d1 = dist(l[0], center) - rMin;
+        const d2 = dist(l[1], center) - rMin;
+        const minD = Math.min(d1, d2);
+        const maxD = Math.max(d1, d2);
+        const toCenter1 = directionFromTo(l[0], center);
+        const toCenter2 = directionFromTo(l[1], center);
+        const dir = directionFromTo(l[0], l[1]);
+        const isDirTangent = Math.abs(toCenter1[0] * dir[0] + toCenter1[1] * dir[1]) < 0.4;
+        const d1ToEdge = Math.abs(d1 - edgeCircleDist);
+        const d2ToEdge = Math.abs(d2 - edgeCircleDist);
+
+        const offsettedP1 = [l[0][0] + toCenter1[0] * distToEdge, l[0][1] + toCenter1[1] * distToEdge - 0.08];
+        const offsettedP2 = [l[1][0] + toCenter2[0] * distToEdge, l[1][1] + toCenter2[1] * distToEdge - 0.08];
+
+        if (isDirTangent && d1ToEdge < r*0.1 && d2ToEdge < r * 0.1) // edge - not needed xD
+        {
+            //linesOut.push(l);
+            //linesOut.push([offsettedP1, offsettedP2]);
+            return;
+        }
+
+        if (d1ToEdge > r * 0.1 && d2ToEdge > r * 0.1 && minD > distToEdge) // outer decor
+        {
+            linesOut.push(l);
+            return;
+        }
+
+        const rngDist = Math.random() * distToEdge * 0.8;
+        const outerOffsettedP1 = [
+            l[0][0] + toCenter1[0] * rngDist,
+            l[0][1] + toCenter1[1] * rngDist - 0.08
+        ];
+        const outerOffsettedP2 = [
+            l[1][0] + toCenter2[0] * rngDist,
+            l[1][1] + toCenter2[1] * rngDist - 0.08
+        ];
+        if (minD > distToEdge - 0.1 && maxD > distToEdge + 0.1) // onEdge-outer
+        {
+            if (d1 < d2) linesOut.push([outerOffsettedP1, l[1]]);
+            else linesOut.push([outerOffsettedP2, l[0]]);
+
+            return;
+        }
+
+        if (maxD < r * 0.4)
+        {
+            linesOut.push(l);
+        }
+    });
 };
 
 let eye_contour_svg;
