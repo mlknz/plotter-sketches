@@ -92,8 +92,9 @@ const dist = (a, b) =>
     return Math.sqrt(distSq(a, b));
 }
 
-const fancyIrisMaths = (linesIn, linesOut) =>
+const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
 {
+    const sexyEyeLines = [];
     const allPoints = [];
     let center = [0, 0];
     linesIn.forEach(l => {
@@ -156,14 +157,14 @@ const fancyIrisMaths = (linesIn, linesOut) =>
 
         if (isDirTangent && d1ToEdge < r*0.1 && d2ToEdge < r * 0.1) // edge - not needed xD
         {
-            //linesOut.push(l);
-            //linesOut.push([offsettedP1, offsettedP2]);
+            //sexyEyeLines.push(l);
+            //sexyEyeLines.push([offsettedP1, offsettedP2]);
             return;
         }
 
         if (d1ToEdge > r * 0.1 && d2ToEdge > r * 0.1 && minD > distToEdge) // outer decor
         {
-            linesOut.push(l);
+            sexyEyeLines.push(l);
             return;
         }
 
@@ -178,22 +179,36 @@ const fancyIrisMaths = (linesIn, linesOut) =>
         ];
         if (minD > distToEdge - 0.1 && maxD > distToEdge + 0.1) // onEdge-outer
         {
-            if (d1 < d2) linesOut.push([outerOffsettedP1, l[1]]);
-            else linesOut.push([outerOffsettedP2, l[0]]);
+            if (d1 < d2) sexyEyeLines.push([outerOffsettedP1, l[1]]);
+            else sexyEyeLines.push([outerOffsettedP2, l[0]]);
 
             return;
         }
 
         if (maxD < r * 0.4)
         {
-            linesOut.push(l);
+            sexyEyeLines.push(l);
         }
     });
+
+    addLinesCutWithContourAndMask(sexyEyeLines, tearCenterPolyline, tearMaskFunc, linesOut);
 };
 
 let eye_contour_svg;
+let tear_center_svg;
+let tear_edge_svg;
+let decor_svg;
 loadsvg('assets/eye_contour.svg', async(err, svg) => {
   eye_contour_svg = await segments(await linearize(svg, { tolerance: 0 }));
+});
+loadsvg('assets/tear_center.svg', async(err, svg) => {
+  tear_center_svg = await segments(await linearize(svg, { tolerance: 0 }));
+});
+loadsvg('assets/tear_edge.svg', async(err, svg) => {
+  tear_edge_svg = await segments(await linearize(svg, { tolerance: 0 }));
+});
+loadsvg('assets/decor.svg', async(err, svg) => {
+  decor_svg = await segments(await linearize(svg, { tolerance: 0 }));
 });
 
 
@@ -215,6 +230,7 @@ const sketch = async ({ width, height, units, render }) => {
     const eye_iris_bmp = tmpContext.getImageData(0, 0, img_size, img_size);
 
     const eye_base_contour = [];
+    const tear_center_polyline = [];
     const mapSegCoords = (seg, offset) => {
         const x = (seg[0] / img_size) * (width - eye_outer_margin*2) + eye_outer_margin + offset[0];
         const y = (seg[1] / img_size) * (height - eye_outer_margin*2) + eye_outer_margin + offset[1];
@@ -228,13 +244,33 @@ const sketch = async ({ width, height, units, render }) => {
             eye_base_contour.push(contourLine);
         }
     });
+    tear_center_svg.forEach(seg => {
+        for (let i = 0; i < seg.length - 1; ++i)
+        {
+            const contourLine = [mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])];
+            lines.push(contourLine);
+            tear_center_polyline.push(contourLine);
+        }
+    });
+    tear_edge_svg.forEach(seg => {
+        for (let i = 0; i < seg.length - 1; ++i)
+        {
+            lines.push([mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])]);
+        }
+    });
+    decor_svg.forEach(seg => {
+        for (let i = 0; i < seg.length - 1; ++i)
+        {
+            lines.push([mapSegCoords(seg[i], [0, 0]), mapSegCoords(seg[(i + 1) % seg.length], [0, 0])]);
+        }
+    });
 
-    // const linesManh = [];
-    // const manh = generateManhattanVoronoi(width, height);
-    // fillManhNodesPoints(manh, points);
-    // fillManhCellsLines(manh, innerCellRadiusMargin, linesManh);
-    // const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1]);
-    // addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
+    const linesManh = [];
+    const manh = generateManhattanVoronoi(width, height);
+    fillManhNodesPoints(manh, points);
+    fillManhCellsLines(manh, innerCellRadiusMargin, linesManh);
+    const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1]);
+    addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
 
     const linesIrisBase = [];
     const linesIris = [];
@@ -242,8 +278,9 @@ const sketch = async ({ width, height, units, render }) => {
     addSegmentsFromPolys(irisPolys.partiallyInside, linesIrisBase, [0, 0], debug);
     addSegmentsFromPolys(irisPolys.fullyOutside, linesIrisBase, [0, 0], debug);
     const irisMaskFunc = point => !pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [2]);
+    const tearMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [1]);
     addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
-    fancyIrisMaths(linesIris, lines);
+    fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
 
     const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
 
