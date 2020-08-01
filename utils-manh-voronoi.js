@@ -16,7 +16,7 @@ const manhPerimeter = (poly) => {
     return result;
 };
 
-const addPolygonLines = (polygonPoints, viewHeight, outLines) => {
+const addPolygonLines = (polygonPoints, viewWidth, viewHeight, outLines) => {
     let cellCenterX = 0;
     let cellCenterY = 0;
     polygonPoints.forEach(p => {
@@ -25,14 +25,20 @@ const addPolygonLines = (polygonPoints, viewHeight, outLines) => {
     });
     cellCenterX /= polygonPoints.length;
     cellCenterY /= polygonPoints.length;
+    const xEdgeTerm = Math.abs(cellCenterX / viewWidth - 0.5) * 2.0;
     const yTerm = cellCenterY / viewHeight;
-    let cellDistortionTerm = yTerm * yTerm * 3.0;
+
+    const cellDistortionTerm = yTerm * yTerm * 3.0;
+
+    if (xEdgeTerm > yTerm) // shiet man do a config for such shiet already please shiet
+    {
+        return; // triangle shape
+    }
     const randomDir = Math.random() * Math.PI;
-
     const distortionOffset = [ Math.cos(randomDir) * cellDistortionTerm, Math.sin(randomDir) * cellDistortionTerm ];
-
     for (let j = 0; j < polygonPoints.length; ++j)
     {
+
           const jNext = (j + 1) % polygonPoints.length;
           const p1 = [polygonPoints[j][0] + distortionOffset[0], polygonPoints[j][1] + distortionOffset[1]];
           const p2 = [polygonPoints[jNext][0] + distortionOffset[0], polygonPoints[jNext][1] + distortionOffset[1]];
@@ -172,16 +178,16 @@ const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin, po
     return [];
 };
 
-export function fillManhCellsLines(manh, innerCellRadiusMargin, outLines, height) {
+export function fillManhCellsLines(manh, innerCellRadiusMargin, outLines, width, height) {
     manh.forEach(mi => {
         const innerPoly = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin, [ mi.polygonPoints ]);
         const innerPoly2 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 2, [ mi.polygonPoints, innerPoly ]);
         const innerPoly3 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 3, [ mi.polygonPoints, innerPoly, innerPoly2 ]);
 
-        addPolygonLines(mi.polygonPoints, height, outLines);
-        addPolygonLines(innerPoly, height, outLines);
-        addPolygonLines(innerPoly2, height, outLines);
-        addPolygonLines(innerPoly3, height, outLines);
+        addPolygonLines(mi.polygonPoints, width, height, outLines);
+        addPolygonLines(innerPoly, width, height, outLines);
+        addPolygonLines(innerPoly2, width, height, outLines);
+        addPolygonLines(innerPoly3, width, height, outLines);
     });
 };
 
