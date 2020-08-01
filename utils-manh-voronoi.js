@@ -25,17 +25,20 @@ const addPolygonLines = (polygonPoints, viewWidth, viewHeight, outLines) => {
     });
     cellCenterX /= polygonPoints.length;
     cellCenterY /= polygonPoints.length;
-    const xEdgeTerm = Math.abs(cellCenterX / viewWidth - 0.5) * 2.0;
+
     const yTerm = cellCenterY / viewHeight;
 
-    const cellDistortionTerm = yTerm * yTerm * 3.0;
+    const cellDistortionTerm = yTerm * yTerm * 1.5;
 
-    if (xEdgeTerm > yTerm) // shiet man do a config for such shiet already please shiet
+    const randomDir = Math.random() * Math.PI;
+    const distortionOffset = [ Math.cos(randomDir) * cellDistortionTerm, Math.sin(randomDir) * cellDistortionTerm ];
+
+    const xEdgeTerm = Math.abs((cellCenterX + distortionOffset[0]) / viewWidth - 0.5) * 2.0;
+    if (xEdgeTerm * 0.666 > yTerm) // shiet man do a config for such shiet already please shiet
     {
         return; // triangle shape
     }
-    const randomDir = Math.random() * Math.PI;
-    const distortionOffset = [ Math.cos(randomDir) * cellDistortionTerm, Math.sin(randomDir) * cellDistortionTerm ];
+
     for (let j = 0; j < polygonPoints.length; ++j)
     {
 

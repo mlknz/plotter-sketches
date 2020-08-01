@@ -27,11 +27,11 @@ const img_size = 512;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 400;
+const randomPointsCount = 666;
 const irisVoroGenPointsCount = 45000;
 const margin = 0.5;
 const eye_outer_margin = 0.5;
-const eye_offset = [0, 2.8];
+const eye_offset = [0, 2.4];
 const innerCellRadiusMargin = 0.06;
 const lines = [];
 const points = [];
@@ -91,6 +91,58 @@ const distSq = (a, b) =>
 const dist = (a, b) =>
 {
     return Math.sqrt(distSq(a, b));
+}
+
+const fitLinesToCanvas = (lines, width, height) =>
+{
+    let minX = 666;
+    let minY = 666;
+    let maxX = -666;
+    let maxY = -666;
+    lines.forEach(l =>
+    {
+        const xMinLine = Math.min(l[0][0], l[1][0]);
+        const xMaxLine = Math.max(l[0][0], l[1][0]);
+        const yMinLine = Math.min(l[0][1], l[1][1]);
+        const yMaxLine = Math.max(l[0][1], l[1][1]);
+        minX = Math.min(minX, xMinLine);
+        maxX = Math.max(maxX, xMaxLine);
+        minY = Math.min(minY, yMinLine);
+        maxY = Math.max(maxY, yMaxLine);
+    });
+
+    minY -= 0.05;
+    maxY += 0.05;
+
+    const centerX = (maxX + minX) * 0.5;
+    const centerY = (maxY + minY) * 0.5;
+    const scaleX = (maxX-minX) / width;
+    const scaleY = (maxY-minY) / height;
+    const scale = Math.max(scaleX, scaleY);
+
+    const mapPoint = (p) => {
+        p[0] += width/2 - centerX;
+        p[1] += height/2 - centerY;
+
+        p[0] -= centerX;
+        p[1] -= centerY;
+
+        p[0] /= scale;
+        p[1] /= scale;
+
+        p[0] += centerX;
+        p[1] += centerY;
+
+        return p;
+    };
+
+    const result = [];
+    lines.forEach(l =>
+    {
+       result.push([mapPoint(l[0]), mapPoint(l[1])]);
+    });
+
+    return result;
 }
 
 const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
@@ -291,6 +343,8 @@ const sketch = async ({ width, height, units, render }) => {
 
     //const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
 
+    const linesFitToCanvas = fitLinesToCanvas(lines, width, height);
+
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
     context.fillStyle = 'white';
@@ -304,7 +358,7 @@ return ({ context }) => {
     //   context.stroke();
     // });
 
-    lines.forEach(line => {
+    linesFitToCanvas.forEach(line => {
       context.beginPath();
       line.forEach(p => context.lineTo(p[0], p[1]));
       context.strokeStyle = 'black';
@@ -327,7 +381,7 @@ return ({ context }) => {
     return [
       context.canvas,
       {
-        data: polylinesToSVG(lines, { width, height, units } ),
+        data: polylinesToSVG(linesFitToCanvas, { width, height, units } ),
         extension: '.svg'
       }
     ];
