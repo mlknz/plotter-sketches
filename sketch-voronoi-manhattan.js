@@ -388,7 +388,7 @@ return ({ context }) => {
   };
 };
 canvasSketch(sketch, {
-  dimensions: [ 10, 10 ],
+  dimensions: [ 13, 13 ],
   pixelsPerInch: 300,
   units: 'cm',
 });
