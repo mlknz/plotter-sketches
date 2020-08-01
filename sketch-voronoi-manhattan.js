@@ -27,11 +27,11 @@ const img_size = 512;
 const svgSize = 256;
 const penThicknessCm = 0.01;
 
-const randomPointsCount = 130;
+const randomPointsCount = 400;
 const irisVoroGenPointsCount = 45000;
 const margin = 0.5;
 const eye_outer_margin = 0.5;
-const innerCellRadiusMargin = 0.125;
+const innerCellRadiusMargin = 0.05;
 const lines = [];
 const points = [];
 
@@ -43,7 +43,7 @@ const generateManhattanVoronoi = (width, height) => {
     {
         const manhFilteredPolygonPoints = mi.polygonPoints.filter((item, index) => mi.polygonPoints.indexOf(item) == index);
         mi.polygonPoints = manhFilteredPolygonPoints;
-    })
+    });
     return manhattan;
 };
 
@@ -155,7 +155,7 @@ const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
         const offsettedP1 = [l[0][0] + toCenter1[0] * distToEdge, l[0][1] + toCenter1[1] * distToEdge - 0.08];
         const offsettedP2 = [l[1][0] + toCenter2[0] * distToEdge, l[1][1] + toCenter2[1] * distToEdge - 0.08];
 
-        if (isDirTangent && d1ToEdge < r*0.1 && d2ToEdge < r * 0.1) // edge - not needed xD
+        if (isDirTangent && d1ToEdge < r*0.1 && d2ToEdge < r * 0.1) // edge - not needed
         {
             //sexyEyeLines.push(l);
             //sexyEyeLines.push([offsettedP1, offsettedP2]);
@@ -267,10 +267,15 @@ const sketch = async ({ width, height, units, render }) => {
 
     const linesManh = [];
     const manh = generateManhattanVoronoi(width, height);
-    fillManhNodesPoints(manh, points);
-    fillManhCellsLines(manh, innerCellRadiusMargin, linesManh);
+    //fillManhNodesPoints(manh, points);
+    fillManhCellsLines(manh, innerCellRadiusMargin, linesManh, height);
     const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1]);
     addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
+
+    // DEBUG: no eye masj
+    // const manhMaskFunc = point => false;
+    // addLinesCutWithContourAndMask(linesManh, [], manhMaskFunc, lines);
+
 
     const linesIrisBase = [];
     const linesIris = [];
@@ -282,23 +287,20 @@ const sketch = async ({ width, height, units, render }) => {
     addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
     fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
 
-    const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
-
-
-  // 2. point circles to lines
+    //const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
 
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
 
-    pointsEyeCut.forEach(p => {
-      context.beginPath();
-      context.arc(p[0], p[1], 0.03, 0, Math.PI * 2);
-      context.strokeStyle = 'black';
-      context.lineWidth = penThicknessCm ;
-      context.stroke();
-    });
+    // pointsEyeCut.forEach(p => {
+    //   context.beginPath();
+    //   context.arc(p[0], p[1], 0.03, 0, Math.PI * 2);
+    //   context.strokeStyle = 'black';
+    //   context.lineWidth = penThicknessCm ;
+    //   context.stroke();
+    // });
 
     lines.forEach(line => {
       context.beginPath();
