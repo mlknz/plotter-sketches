@@ -14,10 +14,7 @@ import { generatePoints, segmentsEqual, pointsEqual, addSegmentsFromPolys,
    getBMPColor, pointInBMPMask, findMedianDir, directionFromTo, intersectEdges } from "./utils.js";
 import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
 import { fillManhNodesPoints, fillManhCellsLines } from "./utils-manh-voronoi.js";
-
-// working L1 voronoi gen is currently in https://github.com/mlknz/manhattan-voronoi (fix_points_nudge branch)
-// use manhattan-voronoi npm module after fix merge
-import { generateL1Voronoi } from "C:\\libs\\manhattan-voronoi\\src\\voronoi.js";
+import { generateL1Voronoi } from "./libs/voronoi.js";
 
 const debug = {
     drawPoints: false,
