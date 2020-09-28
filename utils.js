@@ -119,3 +119,55 @@ export function intersectEdges(a, b) {
     }
     return [a0x + aDirUnnorm[0] * t, a0y + aDirUnnorm[1] * t];
 };
+
+export function fitLinesToCanvas(lines, width, height)
+{
+    let minX = 666;
+    let minY = 666;
+    let maxX = -666;
+    let maxY = -666;
+    lines.forEach(l =>
+    {
+        const xMinLine = Math.min(l[0][0], l[1][0]);
+        const xMaxLine = Math.max(l[0][0], l[1][0]);
+        const yMinLine = Math.min(l[0][1], l[1][1]);
+        const yMaxLine = Math.max(l[0][1], l[1][1]);
+        minX = Math.min(minX, xMinLine);
+        maxX = Math.max(maxX, xMaxLine);
+        minY = Math.min(minY, yMinLine);
+        maxY = Math.max(maxY, yMaxLine);
+    });
+
+    minY -= 0.05;
+    maxY += 0.05;
+
+    const centerX = (maxX + minX) * 0.5;
+    const centerY = (maxY + minY) * 0.5;
+    const scaleX = (maxX-minX) / width;
+    const scaleY = (maxY-minY) / height;
+    const scale = Math.max(scaleX, scaleY);
+
+    const mapPoint = (p) => {
+        p[0] += width/2 - centerX;
+        p[1] += height/2 - centerY;
+
+        p[0] -= centerX;
+        p[1] -= centerY;
+
+        p[0] /= scale;
+        p[1] /= scale;
+
+        p[0] += centerX;
+        p[1] += centerY;
+
+        return p;
+    };
+
+    const result = [];
+    lines.forEach(l =>
+    {
+       result.push([mapPoint(l[0]), mapPoint(l[1])]);
+    });
+
+    return result;
+}

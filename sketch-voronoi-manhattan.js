@@ -11,30 +11,22 @@ const linearize = require('svg-linearize');
 
 const { polylinesToSVG } = require('canvas-sketch-util/penplot');
 import { generatePoints, segmentsEqual, pointsEqual, addSegmentsFromPolys,
-   getBMPColor, pointInBMPMask, findMedianDir, directionFromTo, intersectEdges } from "./utils.js";
+   getBMPColor, pointInBMPMask, findMedianDir, directionFromTo, intersectEdges, fitLinesToCanvas } from "./utils.js";
 import { voronoiPolysFromPointsAndMask } from "./utils-voronoi.js";
 import { fillManhNodesPoints, fillManhCellsLines } from "./utils-manh-voronoi.js";
 import { generateL1Voronoi } from "./libs/voronoi.js";
+import { config } from "./config.js";
 
 const debug = {
     drawPoints: false,
     duplicateSegments: 0
 };
-const img_size = 512;
-const svgSize = 256;
-const penThicknessCm = 0.01;
 
-const randomPointsCount = 666;
-const irisVoroGenPointsCount = 45000;
-const margin = 0.5;
-const eye_outer_margin = 0.5;
-const eye_offset = [0, 2.4];
-const innerCellRadiusMargin = 0.06;
 const lines = [];
 const points = [];
 
 const generateManhattanVoronoi = (width, height) => {
-    const randomPoints = generatePoints(randomPointsCount, width, height, margin);
+    const randomPoints = generatePoints(config.randomPointsCount, width, height, config.margin);
     const manhattan = generateL1Voronoi(randomPoints, width, height, true);
 
     manhattan.forEach(mi =>
@@ -46,10 +38,10 @@ const generateManhattanVoronoi = (width, height) => {
 };
 
 const generateIrisVoronoi = (width, height, bmpMask, eyeOffset) => {
-    const randomPoints = generatePoints(irisVoroGenPointsCount, width, height, margin);
-    const irisMaskFunc = entry => pointInBMPMask(entry, width, height, margin, bmpMask, [0], eyeOffset);
+    const randomPoints = generatePoints(config.irisVoroGenPointsCount, width, height, config.margin);
+    const irisMaskFunc = entry => pointInBMPMask(entry, width, height, config.margin, bmpMask, [0], eyeOffset);
 
-    const irisPolys = voronoiPolysFromPointsAndMask(randomPoints, width, height, margin, irisMaskFunc);
+    const irisPolys = voronoiPolysFromPointsAndMask(randomPoints, width, height, config.margin, irisMaskFunc);
 
     return irisPolys;
 };
@@ -88,58 +80,6 @@ const distSq = (a, b) =>
 const dist = (a, b) =>
 {
     return Math.sqrt(distSq(a, b));
-}
-
-const fitLinesToCanvas = (lines, width, height) =>
-{
-    let minX = 666;
-    let minY = 666;
-    let maxX = -666;
-    let maxY = -666;
-    lines.forEach(l =>
-    {
-        const xMinLine = Math.min(l[0][0], l[1][0]);
-        const xMaxLine = Math.max(l[0][0], l[1][0]);
-        const yMinLine = Math.min(l[0][1], l[1][1]);
-        const yMaxLine = Math.max(l[0][1], l[1][1]);
-        minX = Math.min(minX, xMinLine);
-        maxX = Math.max(maxX, xMaxLine);
-        minY = Math.min(minY, yMinLine);
-        maxY = Math.max(maxY, yMaxLine);
-    });
-
-    minY -= 0.05;
-    maxY += 0.05;
-
-    const centerX = (maxX + minX) * 0.5;
-    const centerY = (maxY + minY) * 0.5;
-    const scaleX = (maxX-minX) / width;
-    const scaleY = (maxY-minY) / height;
-    const scale = Math.max(scaleX, scaleY);
-
-    const mapPoint = (p) => {
-        p[0] += width/2 - centerX;
-        p[1] += height/2 - centerY;
-
-        p[0] -= centerX;
-        p[1] -= centerY;
-
-        p[0] /= scale;
-        p[1] /= scale;
-
-        p[0] += centerX;
-        p[1] += centerY;
-
-        return p;
-    };
-
-    const result = [];
-    lines.forEach(l =>
-    {
-       result.push([mapPoint(l[0]), mapPoint(l[1])]);
-    });
-
-    return result;
 }
 
 const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
@@ -190,6 +130,18 @@ const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
     edgeCircleDist /= innerCirclePointsCount;
     const distToEdge = edgeCircleDist + 0.0 * r;
 
+    if (config.debugShowIrisOrigVoro)
+    {
+        linesIn.forEach(l => linesOut.push(l));
+        return;
+    }
+    if (config.debugShowIrisOrigVoroCutWithTear)
+    {
+        linesIn.forEach(l => sexyEyeLines.push(l));
+        addLinesCutWithContourAndMask(sexyEyeLines, tearCenterPolyline, tearMaskFunc, linesOut);
+        return;
+    }
+
     linesIn.forEach(l => {
         const d1 = dist(l[0], center) - rMin;
         const d2 = dist(l[1], center) - rMin;
@@ -205,10 +157,8 @@ const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
         const offsettedP1 = [l[0][0] + toCenter1[0] * distToEdge, l[0][1] + toCenter1[1] * distToEdge - 0.08];
         const offsettedP2 = [l[1][0] + toCenter2[0] * distToEdge, l[1][1] + toCenter2[1] * distToEdge - 0.08];
 
-        if (isDirTangent && d1ToEdge < r*0.1 && d2ToEdge < r * 0.1) // edge - not needed
+        if (isDirTangent && d1ToEdge < r*0.1 && d2ToEdge < r*0.1) // center edge - not needed
         {
-            //sexyEyeLines.push(l);
-            //sexyEyeLines.push([offsettedP1, offsettedP2]);
             return;
         }
 
@@ -266,31 +216,31 @@ const sketch = async ({ width, height, units, render }) => {
 
     const img_eye_base = await load('assets/eye_base.png');
     const canvas = document.createElement('canvas');
-    canvas.width = img_size;
-    canvas.height = img_size;
+    canvas.width = config.img_size;
+    canvas.height = config.img_size;
     const tmpContext = canvas.getContext('2d');
     tmpContext.imageSmoothingEnabled = false;
-    tmpContext.clearRect(0, 0, img_size, img_size);
-    tmpContext.drawImage(img_eye_base, 0, 0, img_size, img_size);
-    const eye_base_bmp = tmpContext.getImageData(0, 0, img_size, img_size);
+    tmpContext.clearRect(0, 0, config.img_size, config.img_size);
+    tmpContext.drawImage(img_eye_base, 0, 0, config.img_size, config.img_size);
+    const eye_base_bmp = tmpContext.getImageData(0, 0, config.img_size, config.img_size);
 
     const img_eye_iris = await load('assets/eye_iris.png');
-    tmpContext.clearRect(0, 0, img_size, img_size);
-    tmpContext.drawImage(img_eye_iris, 0, 0, img_size, img_size);
-    const eye_iris_bmp = tmpContext.getImageData(0, 0, img_size, img_size);
+    tmpContext.clearRect(0, 0, config.img_size, config.img_size);
+    tmpContext.drawImage(img_eye_iris, 0, 0, config.img_size, config.img_size);
+    const eye_iris_bmp = tmpContext.getImageData(0, 0, config.img_size, config.img_size);
 
     const eye_base_contour = [];
     const tear_center_polyline = [];
     const mapSegCoords = (seg, offset) => {
-        const x = (seg[0] / img_size) * (width - eye_outer_margin*2) + eye_outer_margin + offset[0];
-        const y = (seg[1] / img_size) * (height - eye_outer_margin*2) + eye_outer_margin + offset[1];
+        const x = (seg[0] / config.img_size) * (width - config.eye_outer_margin*2) + config.eye_outer_margin + offset[0];
+        const y = (seg[1] / config.img_size) * (height - config.eye_outer_margin*2) + config.eye_outer_margin + offset[1];
         return [x, y];
     }
 
     eye_contour_svg.forEach(seg => {
         for (let i = 0; i < seg.length; ++i)
         {
-            const contourLine = [mapSegCoords(seg[i], eye_offset), mapSegCoords(seg[(i + 1) % seg.length], eye_offset)];
+            const contourLine = [mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)];
             lines.push(contourLine);
             eye_base_contour.push(contourLine);
         }
@@ -298,7 +248,7 @@ const sketch = async ({ width, height, units, render }) => {
     tear_center_svg.forEach(seg => {
         for (let i = 0; i < seg.length - 1; ++i)
         {
-            const contourLine = [mapSegCoords(seg[i], eye_offset), mapSegCoords(seg[(i + 1) % seg.length], eye_offset)];
+            const contourLine = [mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)];
             lines.push(contourLine);
             tear_center_polyline.push(contourLine);
         }
@@ -306,21 +256,21 @@ const sketch = async ({ width, height, units, render }) => {
     tear_edge_svg.forEach(seg => {
         for (let i = 0; i < seg.length - 1; ++i)
         {
-            lines.push([mapSegCoords(seg[i], eye_offset), mapSegCoords(seg[(i + 1) % seg.length], eye_offset)]);
+            lines.push([mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)]);
         }
     });
     decor_svg.forEach(seg => {
         for (let i = 0; i < seg.length - 1; ++i)
         {
-            lines.push([mapSegCoords(seg[i], eye_offset), mapSegCoords(seg[(i + 1) % seg.length], eye_offset)]);
+            lines.push([mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)]);
         }
     });
 
     const linesManh = [];
     const manh = generateManhattanVoronoi(width, height);
     //fillManhNodesPoints(manh, points);
-    fillManhCellsLines(manh, innerCellRadiusMargin, linesManh, width, height);
-    const manhMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [0, 1], eye_offset);
+    fillManhCellsLines(manh, config.innerCellRadiusMargin, linesManh, width, height);
+    const manhMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [0, 1], config.eye_offset);
     addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
 
     // DEBUG: no eye mask
@@ -330,15 +280,15 @@ const sketch = async ({ width, height, units, render }) => {
 
     const linesIrisBase = [];
     const linesIris = [];
-    const irisPolys = generateIrisVoronoi(width, height, eye_iris_bmp, eye_offset);
+    const irisPolys = generateIrisVoronoi(width, height, eye_iris_bmp, config.eye_offset);
     addSegmentsFromPolys(irisPolys.partiallyInside, linesIrisBase, [0, 0], debug);
     addSegmentsFromPolys(irisPolys.fullyOutside, linesIrisBase, [0, 0], debug);
-    const irisMaskFunc = point => !pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [2], eye_offset);
-    const tearMaskFunc = point => pointInBMPMask(point, width, height, eye_outer_margin, eye_base_bmp, [1], eye_offset);
+    const irisMaskFunc = point => !pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [2], config.eye_offset);
+    const tearMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [1], config.eye_offset);
     addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
     fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
 
-    //const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, eye_outer_margin, eye_base_bmp, [0, 1]));
+    //const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, config.eye_outer_margin, eye_base_bmp, [0, 1]));
 
     const linesFitToCanvas = fitLinesToCanvas(lines, width, height);
 
@@ -351,7 +301,7 @@ return ({ context }) => {
     //   context.beginPath();
     //   context.arc(p[0], p[1], 0.03, 0, Math.PI * 2);
     //   context.strokeStyle = 'black';
-    //   context.lineWidth = penThicknessCm ;
+    //   context.lineWidth = config.penThicknessCm ;
     //   context.stroke();
     // });
 
@@ -359,7 +309,7 @@ return ({ context }) => {
       context.beginPath();
       line.forEach(p => context.lineTo(p[0], p[1]));
       context.strokeStyle = 'black';
-      context.lineWidth = penThicknessCm;
+      context.lineWidth = config.penThicknessCm;
       context.lineJoin = 'round';
       context.lineCap = 'round';
       context.stroke();
@@ -370,7 +320,7 @@ return ({ context }) => {
         context.beginPath();
         context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
         context.strokeStyle = context.fillStyle = 'red';
-        context.lineWidth = penThicknessCm;
+        context.lineWidth = config.penThicknessCm;
         context.fill();
       });
     }
