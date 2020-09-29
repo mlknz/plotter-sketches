@@ -18,12 +18,11 @@ import { generateL1Voronoi } from "./libs/voronoi.js";
 import { config } from "./config.js";
 
 const debug = {
-    drawPoints: false,
     duplicateSegments: 0
 };
 
 const lines = [];
-const points = [];
+let points;
 
 const generateManhattanVoronoi = (width, height) => {
     const randomPoints = generatePoints(config.randomPointsCount, width, height, config.margin);
@@ -42,8 +41,9 @@ const generateIrisVoronoi = (width, height, bmpMask, eyeOffset) => {
     const irisMaskFunc = entry => pointInBMPMask(entry, width, height, config.margin, bmpMask, [0], eyeOffset);
 
     const irisPolys = voronoiPolysFromPointsAndMask(randomPoints, width, height, config.margin, irisMaskFunc);
+    const maskedPoints = randomPoints.filter(entry => pointInBMPMask(entry, width, height, config.margin, bmpMask, [0], eyeOffset));
 
-    return irisPolys;
+    return { allPoints: randomPoints, maskedPoints: maskedPoints, polys: irisPolys };
 };
 
 const addLinesCutWithContourAndMask = (linesToCut, contourLines, maskFunc, linesOut) => {
@@ -135,7 +135,7 @@ const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
         linesIn.forEach(l => linesOut.push(l));
         return;
     }
-    if (config.debugShowIrisOrigVoroCutWithTear)
+    if (config.debugShowIrisOrigVoroCutWithContour)
     {
         linesIn.forEach(l => sexyEyeLines.push(l));
         addLinesCutWithContourAndMask(sexyEyeLines, tearCenterPolyline, tearMaskFunc, linesOut);
@@ -241,7 +241,7 @@ const sketch = async ({ width, height, units, render }) => {
         for (let i = 0; i < seg.length; ++i)
         {
             const contourLine = [mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)];
-            lines.push(contourLine);
+            if (config.showSvgContours) lines.push(contourLine);
             eye_base_contour.push(contourLine);
         }
     });
@@ -249,20 +249,20 @@ const sketch = async ({ width, height, units, render }) => {
         for (let i = 0; i < seg.length - 1; ++i)
         {
             const contourLine = [mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)];
-            lines.push(contourLine);
+            if (config.showSvgContours) lines.push(contourLine);
             tear_center_polyline.push(contourLine);
         }
     });
     tear_edge_svg.forEach(seg => {
         for (let i = 0; i < seg.length - 1; ++i)
         {
-            lines.push([mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)]);
+            if (config.showSvgContours) lines.push([mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)]);
         }
     });
     decor_svg.forEach(seg => {
         for (let i = 0; i < seg.length - 1; ++i)
         {
-            lines.push([mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)]);
+             if (config.showSvgContours) lines.push([mapSegCoords(seg[i], config.eye_offset), mapSegCoords(seg[(i + 1) % seg.length], config.eye_offset)]);
         }
     });
 
@@ -277,35 +277,38 @@ const sketch = async ({ width, height, units, render }) => {
     // const manhMaskFunc = point => false;
     // addLinesCutWithContourAndMask(linesManh, [], manhMaskFunc, lines);
 
+    let irisVoroGenResult;
+    const genIrisLines = config.showIris || config.debugShowIrisOrigVoro || config.debugShowIrisOrigVoroCutWithContour;
+    if (genIrisLines || config.debugShowIrisAllPoints || config.debugShowIrisMaskedPoints)
+    {
+        const linesIrisBase = [];
+        const linesIris = [];
+        irisVoroGenResult = generateIrisVoronoi(width, height, eye_iris_bmp, config.eye_offset);
+        const irisPolys = irisVoroGenResult.polys;
 
-    const linesIrisBase = [];
-    const linesIris = [];
-    const irisPolys = generateIrisVoronoi(width, height, eye_iris_bmp, config.eye_offset);
-    addSegmentsFromPolys(irisPolys.partiallyInside, linesIrisBase, [0, 0], debug);
-    addSegmentsFromPolys(irisPolys.fullyOutside, linesIrisBase, [0, 0], debug);
-    const irisMaskFunc = point => !pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [2], config.eye_offset);
-    const tearMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [1], config.eye_offset);
-    addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
-    fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
+        if (genIrisLines)
+        {
+            addSegmentsFromPolys(irisVoroGenResult.polys.partiallyInside, linesIrisBase, [0, 0], debug);
+            addSegmentsFromPolys(irisVoroGenResult.polys.fullyOutside, linesIrisBase, [0, 0], debug);
+            const irisMaskFunc = point => !pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [2], config.eye_offset);
+            const tearMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [1], config.eye_offset);
+            addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
+            fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
+        }
+    }
 
-    //const pointsEyeCut = points.filter(p => !pointInBMPMask(p, width, height, config.eye_outer_margin, eye_base_bmp, [0, 1]));
-
-    const linesFitToCanvas = fitLinesToCanvas(lines, width, height);
-
+    let linesToDraw = lines;
+    if (config.shrinkToCanvas)
+    {
+        linesToDraw = fitLinesToCanvas(lines, width, height);
+    }
+    
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
 
-    // pointsEyeCut.forEach(p => {
-    //   context.beginPath();
-    //   context.arc(p[0], p[1], 0.03, 0, Math.PI * 2);
-    //   context.strokeStyle = 'black';
-    //   context.lineWidth = config.penThicknessCm ;
-    //   context.stroke();
-    // });
-
-    linesFitToCanvas.forEach(line => {
+    linesToDraw.forEach(line => {
       context.beginPath();
       line.forEach(p => context.lineTo(p[0], p[1]));
       context.strokeStyle = 'black';
@@ -315,11 +318,20 @@ return ({ context }) => {
       context.stroke();
     });
 
-    if (debug.drawPoints) {
-      debugPoints.forEach(p => {
+    if (config.debugShowIrisAllPoints) {
+       irisVoroGenResult.allPoints.forEach(p => {
         context.beginPath();
         context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
         context.strokeStyle = context.fillStyle = 'red';
+        context.lineWidth = config.penThicknessCm;
+        context.fill();
+      });
+    }
+    if (config.debugShowIrisMaskedPoints) {
+       irisVoroGenResult.maskedPoints.forEach(p => {
+        context.beginPath();
+        context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
+        context.strokeStyle = context.fillStyle = 'green';
         context.lineWidth = config.penThicknessCm;
         context.fill();
       });
@@ -328,7 +340,7 @@ return ({ context }) => {
     return [
       context.canvas,
       {
-        data: polylinesToSVG(linesFitToCanvas, { width, height, units } ),
+        data: polylinesToSVG(linesToDraw, { width, height, units } ),
         extension: '.svg'
       }
     ];

@@ -2,7 +2,7 @@ export const config =
 {
     // generation
     randomPointsCount: 666,
-    irisVoroGenPointsCount: 45000,
+    irisVoroGenPointsCount: 42069,
 
     // masks
     svgSize: 256,
@@ -18,7 +18,12 @@ export const config =
     penThicknessCm: 0.01,
 
     // logic
+    shrinkToCanvas: false,
     showSvgContours: true,
+    showIris: true,
+
+    debugShowIrisAllPoints: false,
+    debugShowIrisMaskedPoints: false,
     debugShowIrisOrigVoro: false,
-    debugShowIrisOrigVoroCutWithTear: false,
+    debugShowIrisOrigVoroCutWithContour: false,
 };
