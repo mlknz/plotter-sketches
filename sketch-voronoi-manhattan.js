@@ -17,16 +17,12 @@ import { fillManhNodesPoints, fillManhCellsLines } from "./utils-manh-voronoi.js
 import { generateL1Voronoi } from "./libs/voronoi.js";
 import { config } from "./config.js";
 
-const debug = {
-    duplicateSegments: 0
-};
-
 const lines = [];
-let points;
+let manhAllPointsSeed;
 
 const generateManhattanVoronoi = (width, height) => {
-    const randomPoints = generatePoints(config.randomPointsCount, width, height, config.margin);
-    const manhattan = generateL1Voronoi(randomPoints, width, height, true);
+    manhAllPointsSeed = generatePoints(config.randomPointsCount, width, height, config.margin);
+    const manhattan = generateL1Voronoi(manhAllPointsSeed, width, height, true);
 
     manhattan.forEach(mi =>
     {
@@ -266,16 +262,22 @@ const sketch = async ({ width, height, units, render }) => {
         }
     });
 
+    const pointsManh = [];
     const linesManh = [];
     const manh = generateManhattanVoronoi(width, height);
-    //fillManhNodesPoints(manh, points);
+    if (config.debugShowManhIntersectionFilteredPoints) fillManhNodesPoints(manh, pointsManh);
     fillManhCellsLines(manh, config.innerCellRadiusMargin, linesManh, width, height);
-    const manhMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [0, 1], config.eye_offset);
-    addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
+    if (config.cutManhWithContourAndMask)
+    {
+        const manhMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [0, 1], config.eye_offset);
+        addLinesCutWithContourAndMask(linesManh, eye_base_contour, manhMaskFunc, lines);
+    }
+    else
+    {
+        const manhMaskFunc = point => false;
+        addLinesCutWithContourAndMask(linesManh, [], manhMaskFunc, lines);
+    }
 
-    // DEBUG: no eye mask
-    // const manhMaskFunc = point => false;
-    // addLinesCutWithContourAndMask(linesManh, [], manhMaskFunc, lines);
 
     let irisVoroGenResult;
     const genIrisLines = config.showIris || config.debugShowIrisOrigVoro || config.debugShowIrisOrigVoroCutWithContour;
@@ -288,6 +290,9 @@ const sketch = async ({ width, height, units, render }) => {
 
         if (genIrisLines)
         {
+            const debug = {
+                duplicateSegments: 0
+            };
             addSegmentsFromPolys(irisVoroGenResult.polys.partiallyInside, linesIrisBase, [0, 0], debug);
             addSegmentsFromPolys(irisVoroGenResult.polys.fullyOutside, linesIrisBase, [0, 0], debug);
             const irisMaskFunc = point => !pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [2], config.eye_offset);
@@ -302,7 +307,7 @@ const sketch = async ({ width, height, units, render }) => {
     {
         linesToDraw = fitLinesToCanvas(lines, width, height);
     }
-    
+
 return ({ context }) => {
     context.clearRect(0, 0, width, height);
     context.fillStyle = 'white';
@@ -318,24 +323,20 @@ return ({ context }) => {
       context.stroke();
     });
 
-    if (config.debugShowIrisAllPoints) {
-       irisVoroGenResult.allPoints.forEach(p => {
-        context.beginPath();
-        context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
-        context.strokeStyle = context.fillStyle = 'red';
-        context.lineWidth = config.penThicknessCm;
-        context.fill();
-      });
-    }
-    if (config.debugShowIrisMaskedPoints) {
-       irisVoroGenResult.maskedPoints.forEach(p => {
-        context.beginPath();
-        context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
-        context.strokeStyle = context.fillStyle = 'green';
-        context.lineWidth = config.penThicknessCm;
-        context.fill();
-      });
-    }
+    const drawPoints = (pp, col) =>
+    {
+        pp.forEach(p => {
+         context.beginPath();
+         context.arc(p[0], p[1], 0.02, 0, Math.PI * 2);
+         context.strokeStyle = context.fillStyle = col;
+         context.lineWidth = config.penThicknessCm;
+         context.fill();
+        });
+    };
+    if (config.debugShowManhAllPoints) drawPoints(manhAllPointsSeed, 'red');
+    if (config.debugShowManhIntersectionFilteredPoints) drawPoints(pointsManh, 'blue');
+    if (config.debugShowIrisAllPoints) drawPoints(irisVoroGenResult.allPoints, 'red');
+    if (config.debugShowIrisMaskedPoints) drawPoints(irisVoroGenResult.maskedPoints, 'green');
 
     return [
       context.canvas,

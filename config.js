@@ -18,12 +18,18 @@ export const config =
     penThicknessCm: 0.01,
 
     // logic
-    shrinkToCanvas: false,
+    shrinkToCanvas: true,
     showSvgContours: true,
     showIris: true,
+    cutManhWithContourAndMask: true,
 
-    debugShowIrisAllPoints: false,
-    debugShowIrisMaskedPoints: false,
+    // stages
     debugShowIrisOrigVoro: false,
     debugShowIrisOrigVoroCutWithContour: false,
+
+    // show points
+    debugShowManhAllPoints: false,
+    debugShowManhIntersectionFilteredPoints: false,
+    debugShowIrisAllPoints: false,
+    debugShowIrisMaskedPoints: false,
 };
