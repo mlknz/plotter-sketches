@@ -21,7 +21,7 @@ const lines = [];
 let manhAllPointsSeed;
 
 const generateManhattanVoronoi = (width, height) => {
-    manhAllPointsSeed = generatePoints(config.randomPointsCount, width, height, config.margin);
+    manhAllPointsSeed = generatePoints(config.showManh ? config.randomPointsCount : 0, width, height, config.margin);
     const manhattan = generateL1Voronoi(manhAllPointsSeed, width, height, true);
 
     manhattan.forEach(mi =>

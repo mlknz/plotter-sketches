@@ -17,10 +17,11 @@ export const config =
     penThicknessCm: 0.01,
 
     // logic
-    shrinkToCanvas: true,
-    showSvgContours: true,
+    showManh: true,
     showIris: true,
+    showSvgContours: true,
     cutManhWithContourAndMask: true,
+    shrinkToCanvas: true,
 
     innerCellRadiusMargin: 0.06,
     manhInnerCellSingleContour: false,
