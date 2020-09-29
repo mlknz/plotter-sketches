@@ -1,4 +1,5 @@
 import { findMedianDir, directionFromTo, intersectEdges } from "./utils.js";
+import { config } from "./config.js";
 
 const manhDist = (a, b) => {
     return Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
@@ -28,24 +29,31 @@ const addPolygonLines = (polygonPoints, viewWidth, viewHeight, outLines) => {
 
     const yTerm = cellCenterY / viewHeight;
 
-    const cellDistortionTerm = yTerm *yTerm* 1.5;
-
-    const randomDir = Math.random() * Math.PI;
-    const distortionOffset = [ Math.cos(randomDir) * cellDistortionTerm, Math.sin(randomDir) * cellDistortionTerm ];
-    const xEdgeTerm = Math.abs((cellCenterX + distortionOffset[0]) / viewWidth - 0.5) * 2.0;
-    if ((xEdgeTerm + 0.1) * 0.666 > yTerm) // shiet man do a config for such shiet already please shiet
+    const cellDistortionTerm = config.manhCellUniformDistortion + yTerm*yTerm*config.manhCellHeightDistortion;
+    const randomCellDir = Math.random() * Math.PI;
+    const cellDistortionOffset = [ Math.cos(randomCellDir) * cellDistortionTerm, Math.sin(randomCellDir) * cellDistortionTerm ];
+    const xEdgeTerm = Math.abs((cellCenterX + cellDistortionOffset[0]) / viewWidth - 0.5) * 2.0;
+    if (config.manhTriangleShape && (xEdgeTerm + 0.1) * 0.666 > yTerm)
     {
-        return; // triangle shape
+        return;
     }
 
     for (let j = 0; j < polygonPoints.length; ++j)
     {
+        const edgeDistortionOffset = [0, 0];
+        const edgeDistortionTerm = config.manhEdgeUniformDistortion + yTerm*yTerm*config.manhEdgeHeightDistortion;
+        if (edgeDistortionTerm > 0.0)
+        {
+            const randomEdgeDir = Math.random() * Math.PI;
+            edgeDistortionOffset[0] = Math.cos(randomEdgeDir) * edgeDistortionTerm;
+            edgeDistortionOffset[1] = Math.sin(randomEdgeDir) * edgeDistortionTerm;
+        }
+        const distortion = [cellDistortionOffset[0] + edgeDistortionOffset[0], cellDistortionOffset[1] + edgeDistortionOffset[1]];
+        const jNext = (j + 1) % polygonPoints.length;
+        const p1 = [polygonPoints[j][0] + distortion[0], polygonPoints[j][1] + distortion[1]];
+        const p2 = [polygonPoints[jNext][0] + distortion[0], polygonPoints[jNext][1] + distortion[1]];
 
-          const jNext = (j + 1) % polygonPoints.length;
-          const p1 = [polygonPoints[j][0] + distortionOffset[0], polygonPoints[j][1] + distortionOffset[1]];
-          const p2 = [polygonPoints[jNext][0] + distortionOffset[0], polygonPoints[jNext][1] + distortionOffset[1]];
-
-          outLines.push([p1, p2]);
+        outLines.push([p1, p2]);
     }
 };
 
@@ -182,14 +190,20 @@ const generateInnerCellContour = (polyPoints, polyCenter, desiredInnerMargin, po
 
 export function fillManhCellsLines(manh, innerCellRadiusMargin, outLines, width, height) {
     manh.forEach(mi => {
-        const innerPoly = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin, [ mi.polygonPoints ]);
-        const innerPoly2 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 2, [ mi.polygonPoints, innerPoly ]);
-        const innerPoly3 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 3, [ mi.polygonPoints, innerPoly, innerPoly2 ]);
-
         addPolygonLines(mi.polygonPoints, width, height, outLines);
-        addPolygonLines(innerPoly, width, height, outLines);
-        addPolygonLines(innerPoly2, width, height, outLines);
-        addPolygonLines(innerPoly3, width, height, outLines);
+
+        if (config.manhInnerCellSingleContour || config.manhInnerCellContours)
+        {
+            const innerPoly = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin, [ mi.polygonPoints ]);
+            addPolygonLines(innerPoly, width, height, outLines);
+            if (config.manhInnerCellContours)
+            {
+                const innerPoly2 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 2, [ mi.polygonPoints, innerPoly ]);
+                const innerPoly3 = generateInnerCellContour(mi.polygonPoints, mi.site, innerCellRadiusMargin * 3, [ mi.polygonPoints, innerPoly, innerPoly2 ]);
+                addPolygonLines(innerPoly2, width, height, outLines);
+                addPolygonLines(innerPoly3, width, height, outLines);
+            }
+        }
     });
 };
 

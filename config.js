@@ -10,7 +10,6 @@ export const config =
 
     // margins
     margin: 0.5,
-    innerCellRadiusMargin: 0.06,
     eye_outer_margin: 0.5,
     eye_offset: [0, 2.4],
 
@@ -22,6 +21,15 @@ export const config =
     showSvgContours: true,
     showIris: true,
     cutManhWithContourAndMask: true,
+
+    innerCellRadiusMargin: 0.06,
+    manhInnerCellSingleContour: false,
+    manhInnerCellContours: true,
+    manhTriangleShape: true,
+    manhCellUniformDistortion: 0.0,
+    manhCellHeightDistortion: 1.6,
+    manhEdgeUniformDistortion: 0.0,
+    manhEdgeHeightDistortion: 0.0,
 
     // stages
     debugShowIrisOrigVoro: false,
