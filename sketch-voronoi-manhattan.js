@@ -131,7 +131,7 @@ const fancyIrisMaths = (linesIn, linesOut, tearCenterPolyline, tearMaskFunc) =>
         linesIn.forEach(l => linesOut.push(l));
         return;
     }
-    if (config.debugShowIrisOrigVoroCutWithContour)
+    if (config.debugShowIrisOrigVoroCutWithContour || config.debugShowIrisOrigVoroUnmasked)
     {
         linesIn.forEach(l => sexyEyeLines.push(l));
         addLinesCutWithContourAndMask(sexyEyeLines, tearCenterPolyline, tearMaskFunc, linesOut);
@@ -295,11 +295,18 @@ const sketch = async ({ width, height, units, render }) => {
             };
             addSegmentsFromPolys(irisVoroGenResult.polys.partiallyInside, linesIrisBase, [0, 0], debug);
             addSegmentsFromPolys(irisVoroGenResult.polys.fullyOutside, linesIrisBase, [0, 0], debug);
+            if (config.debugShowIrisOrigVoroUnmasked)
+            {
+                addSegmentsFromPolys(irisVoroGenResult.polys.fullyInside, linesIrisBase, [0, 0], debug);
+            }
+
             const irisMaskFunc = point => !pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [2], config.eye_offset);
             const tearMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [1], config.eye_offset);
             addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
-            if (config.debugShowIrisSolo) fancyIrisMaths(linesIris, lines, eye_base_contour, irisMaskFunc);
-            else fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
+            const linesIrisToUse = config.debugShowIrisOrigVoroUnmasked ? linesIrisBase : linesIris;
+            if (config.debugShowIrisOrigVoroUnmasked)  fancyIrisMaths(linesIrisToUse, lines, [], (p) => {return false;});
+            else if (config.debugShowIrisSolo) fancyIrisMaths(linesIrisToUse, lines, eye_base_contour, irisMaskFunc);
+            else fancyIrisMaths(linesIrisToUse, lines, tear_center_polyline, tearMaskFunc);
         }
     }
 

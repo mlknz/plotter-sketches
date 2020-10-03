@@ -33,6 +33,7 @@ export const config =
     manhEdgeHeightDistortion: 0.0,
 
     // stages
+    debugShowIrisOrigVoroUnmasked: false,
     debugShowIrisOrigVoro: false,
     debugShowIrisOrigVoroCutWithContour: false,
     debugShowIrisSolo: false,
