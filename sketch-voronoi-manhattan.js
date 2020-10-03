@@ -280,7 +280,7 @@ const sketch = async ({ width, height, units, render }) => {
 
 
     let irisVoroGenResult;
-    const genIrisLines = config.showIris || config.debugShowIrisOrigVoro || config.debugShowIrisOrigVoroCutWithContour;
+    const genIrisLines = config.showIris || config.debugShowIrisOrigVoro || config.debugShowIrisOrigVoroCutWithContour || config.debugShowIrisOrigVoroUnmasked;
     if (genIrisLines || config.debugShowIrisAllPoints || config.debugShowIrisMaskedPoints)
     {
         const linesIrisBase = [];
