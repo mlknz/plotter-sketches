@@ -35,6 +35,7 @@ export const config =
     // stages
     debugShowIrisOrigVoro: false,
     debugShowIrisOrigVoroCutWithContour: false,
+    debugShowIrisSolo: false,
 
     // show points
     debugShowManhAllPoints: false,
@@ -42,3 +43,22 @@ export const config =
     debugShowIrisAllPoints: false,
     debugShowIrisMaskedPoints: false,
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//

@@ -298,7 +298,8 @@ const sketch = async ({ width, height, units, render }) => {
             const irisMaskFunc = point => !pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [2], config.eye_offset);
             const tearMaskFunc = point => pointInBMPMask(point, width, height, config.eye_outer_margin, eye_base_bmp, [1], config.eye_offset);
             addLinesCutWithContourAndMask(linesIrisBase, eye_base_contour, irisMaskFunc, linesIris);
-            fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
+            if (config.debugShowIrisSolo) fancyIrisMaths(linesIris, lines, eye_base_contour, irisMaskFunc);
+            else fancyIrisMaths(linesIris, lines, tear_center_polyline, tearMaskFunc);
         }
     }
 
