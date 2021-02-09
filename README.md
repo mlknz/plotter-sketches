@@ -1,5 +1,7 @@
 plotter-sketches
 
+Video with explanation: https://youtu.be/CH_RfiuxcM4.
+
 To run it locally:
 - install nodejs / npm
 - install globally canvas-sketch (npm install canvas-sketch -g)
