@@ -1,4 +1,4 @@
-// canvas-sketch sketch-voronoi-manhattan.js --open --output=export/
+// npx canvas-sketch-cli sketch-voronoi-manhattan.js --open --output=export/
 
 //const clustering = require('density-clustering');
 //const convexHull = require('convex-hull');
