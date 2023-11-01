@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "canvas-sketch": "^0.7.3",
+    "canvas-sketch": "^0.7.7",
     "canvas-sketch-util": "^1.10.0",
     "convex-hull": "^1.0.3",
     "d3-delaunay": "^5.2.1",
@@ -19,6 +19,10 @@
     "load-svg": "^1.0.0",
     "manhattan-voronoi": "^1.0.2",
     "svg-line-segments": "^1.0.0",
-    "svg-linearize": "^1.1.0"
+    "svg-linearize": "^1.1.0",
+    "three": "^0.157.0"
+  },
+  "devDependencies": {
+    "vite": "^4.5.0"
   }
 }
