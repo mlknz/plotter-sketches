@@ -19,10 +19,11 @@
     "load-svg": "^1.0.0",
     "manhattan-voronoi": "^1.0.2",
     "svg-line-segments": "^1.0.0",
-    "svg-linearize": "^1.1.0",
-    "three": "^0.157.0"
+    "svg-linearize": "^1.1.0"
   },
   "devDependencies": {
+    "esmify": "^2.1.1",
+    "three": "^0.147.0",
     "vite": "^4.5.0"
   }
 }
