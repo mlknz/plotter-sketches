@@ -45,64 +45,97 @@ controls.addEventListener('change', () => {
 let currentGeometry;
 let previewMesh;
 
-// Создаем процедурную геометрию
-function createProceduralSphereGeometry(radius, segments) {
+function createProceduralCubesGeometry(radius, segments) {
     const geometry = new THREE.BufferGeometry();
     const vertices = [];
     const indices = [];
     
-    // Создаем вершины
-    for (let lat = 0; lat <= segments; lat++) {
-        const theta = lat * Math.PI / segments;
-        const sinTheta = Math.sin(theta);
-        const cosTheta = Math.cos(theta);
-
-        for (let lon = 0; lon <= segments; lon++) {
-            const phi = lon * 2 * Math.PI / segments;
+    // Параметры спирали
+    const turns = 2;
+    const pointsPerTurn = segments / 2;
+    const totalPoints = turns * pointsPerTurn;
+    const cubeSize = 0.1;
+    const compressionXZ = 0.4;
+    
+    // Создаем две спирали (как в ДНК)
+    for (let spiral = 0; spiral < 2; spiral++) {
+        const spiralOffset = spiral * Math.PI;
+        
+        // Создаем точки вдоль спирали
+        for (let i = 0; i < totalPoints; i++) {
+            const t = i / totalPoints;
+            const theta = 2 * Math.PI * turns * t + spiralOffset;
+            const phi = Math.PI * t;
             
-            // Координаты точки на сфере
-            const x = radius * sinTheta * Math.cos(phi);
-            const y = radius * cosTheta;
-            const z = radius * sinTheta * Math.sin(phi);
+            // Базовая точка на спирали
+            const sinPhi = Math.sin(phi);
+            const cosPhi = Math.cos(phi);
+            const localX = radius * sinPhi * Math.cos(theta) * compressionXZ;
+            const localY = radius * cosPhi;
+            const localZ = radius * sinPhi * Math.sin(theta) * compressionXZ;
             
-            vertices.push(x, y, z);
-        }
-    }
-
-    // Создаем индексы для треугольников
-    for (let lat = 0; lat < segments; lat++) {
-        for (let lon = 0; lon < segments; lon++) {
-            const first = lat * (segments + 1) + lon;
-            const second = first + segments + 1;
+            // Создаем матрицу для куба
+            const cubeMatrix = new THREE.Matrix4();
+            const cubePos = new THREE.Vector3(localX, localY, localZ);
             
-            // Первый треугольник
-            indices.push(first);
-            indices.push(second);
-            indices.push(first + 1);
+            // Вычисляем направление к центру спирали
+            const dirToCenter = new THREE.Vector3().copy(cubePos).multiplyScalar(-1).normalize();
+            const upVector = new THREE.Vector3(0, 1, 0);
+            const rightVector = new THREE.Vector3().crossVectors(upVector, dirToCenter).normalize();
+            const rotatedUpVector = new THREE.Vector3().crossVectors(dirToCenter, rightVector);
             
-            // Второй треугольник
-            indices.push(second);
-            indices.push(second + 1);
-            indices.push(first + 1);
+            // Создаем матрицу ориентации куба
+            cubeMatrix.makeBasis(rightVector, rotatedUpVector, dirToCenter);
+            cubeMatrix.setPosition(cubePos);
+            
+            // Создаем вершины куба
+            const cubeVertices = [
+                [-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1],
+                [-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]
+            ];
+            
+            const startIndex = vertices.length / 3;
+            
+            // Трансформируем и добавляем вершины куба
+            cubeVertices.forEach(([x, y, z]) => {
+                const vertex = new THREE.Vector3(
+                    x * cubeSize * 0.5,
+                    y * cubeSize * 0.5,
+                    z * cubeSize * 0.5
+                ).applyMatrix4(cubeMatrix);
+                
+                vertices.push(vertex.x, vertex.y, vertex.z);
+            });
+            
+            // Индексы для граней куба
+            const cubeIndices = [
+                0, 1, 2, 0, 2, 3,  // нижняя грань
+                4, 6, 5, 4, 7, 6,  // верхняя грань
+                0, 4, 1, 1, 4, 5,  // боковые грани
+                1, 5, 2, 2, 5, 6,
+                2, 6, 3, 3, 6, 7,
+                3, 7, 0, 0, 7, 4
+            ];
+            
+            cubeIndices.forEach(idx => {
+                indices.push(startIndex + idx);
+            });
         }
     }
     
-    // Создаем буферные атрибуты
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setIndex(indices);
-    
-    // Вычисляем нормали
     geometry.computeVertexNormals();
     
     return geometry;
 }
 
 // Создаем геометрию с помощью нашей процедурной функции
-const radius = 1;  // радиус сферы
-const segments = 32;  // количество сегментов (влияет на детализацию)
-currentGeometry = createProceduralSphereGeometry(radius, segments);
+const radius = 1;
+const segments = 48; // уменьшаем количество сегментов, так как теперь у нас кубы
+currentGeometry = createProceduralCubesGeometry(radius, segments);
 
-// Добавляем шум к вершинам
+// Добавляем небольшой шум к вершинам
 const positions = currentGeometry.attributes.position;
 const normals = currentGeometry.attributes.normal;
 
@@ -119,26 +152,17 @@ for (let i = 0; i < positions.count; i++) {
         positions.getZ(i)
     );
 
-    // Создаем шум на основе позиции вершины
+    // Создаем минимальный шум для небольшого разнообразия
     const noise = Random.noise3D(
         pos.x * 2,
         pos.y * 2,
         pos.z * 2,
-        0.5, // частота
-        0.15  // амплитуда
-    );
-
-    // Добавляем высокочастотный шум
-    const noiseHF = Random.noise3D(
-        pos.x * 8,
-        pos.y * 8,
-        pos.z * 8,
-        1, // частота
-        0.05  // амплитуда
+        0.5,
+        0.02  // уменьшаем амплитуду шума
     );
 
     // Смещаем вершину по нормали
-    pos.add(normal.multiplyScalar(noise + noiseHF));
+    pos.add(normal.multiplyScalar(noise));
     
     positions.setXYZ(i, pos.x, pos.y, pos.z);
 }
@@ -147,15 +171,36 @@ for (let i = 0; i < positions.count; i++) {
 currentGeometry.computeVertexNormals();
 
 // Создаем меш для предпросмотра
-const wireframeMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-const wireframeGeometry = new THREE.WireframeGeometry(currentGeometry);
-previewMesh = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
-scene.add(previewMesh);
+const colors = [0xff0000, 0x00ff00, 0x0000ff]; // красный, зеленый, синий
+const shifts = [ // смещения для каждой копии
+    new THREE.Vector3(0.02, 0.02, 0),   // смещение для первой копии
+    new THREE.Vector3(0, 0, 0),         // оригинальная позиция
+    new THREE.Vector3(-0.02, -0.02, 0)  // смещение для второй копии
+];
 
-// Извлекаем линии из геометрии
+// Создаем три отдельных меша для разных цветов
+const meshes = [];
+for (let i = 0; i < 3; i++) {
+    const wireframeMaterial = new THREE.LineBasicMaterial({ 
+        color: colors[i],
+        opacity: 0.7,
+        transparent: true
+    });
+    const wireframeGeometry = new THREE.WireframeGeometry(currentGeometry);
+    const mesh = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
+    
+    // Применяем смещение
+    mesh.position.copy(shifts[i]);
+    
+    scene.add(mesh);
+    meshes.push(mesh);
+}
+
+// Извлекаем линии из геометрии и устанавливаем флаг загрузки
 extractLinesFromGeometry(currentGeometry);
 modelLoaded = true;
 
+// Извлекаем линии из геометрии с RGB-shift
 function extractLinesFromGeometry(geometry) {
     const edges = new Set();
     const positions = geometry.attributes.position.array;
@@ -179,12 +224,11 @@ function extractLinesFromGeometry(geometry) {
         return `${a}-${b}`;
     };
 
-    // Хранилище для нормалей граней
+    // Хранилище для нормалей и центров граней
     const faceNormals = new Map();
-    // Хранилище для центров граней
     const faceCenters = new Map();
-
-    // Если есть индексы, используем их
+    
+    // Собираем все рёбра
     if (indices) {
         for (let i = 0; i < indices.length; i += 3) {
             const v1 = indices[i];
@@ -247,71 +291,83 @@ function extractLinesFromGeometry(geometry) {
         }
     }
 
+    // Создаем случайную перестановку цветов для каждого куба
+    const colorPermutations = [
+        ['#ff0000', '#00ff00', '#0000ff'],
+        ['#ff0000', '#0000ff', '#00ff00'],
+        ['#00ff00', '#ff0000', '#0000ff'],
+        ['#00ff00', '#0000ff', '#ff0000'],
+        ['#0000ff', '#ff0000', '#00ff00'],
+        ['#0000ff', '#00ff00', '#ff0000']
+    ];
+
     // Преобразуем рёбра в линии для canvas-sketch
+    let cubeIndex = 0;
     edges.forEach(edge => {
         const [v1, v2] = edge.split('-').map(Number);
         
-        const point1 = new THREE.Vector3(
-            positions[v1 * 3], 
-            positions[v1 * 3 + 1], 
-            positions[v1 * 3 + 2]
-        );
-        const point2 = new THREE.Vector3(
-            positions[v2 * 3], 
-            positions[v2 * 3 + 1], 
-            positions[v2 * 3 + 2]
-        );
-
-        // Применяем матрицу модели к точкам
-        point1.applyMatrix4(modelMatrix);
-        point2.applyMatrix4(modelMatrix);
-
-        // Проверяем видимость грани
-        const normals = faceNormals.get(edge);
-        const centers = faceCenters.get(edge);
-        if (normals && centers) {
-            // Проверяем все грани, содержащие это ребро
-            let hasVisibleFace = false;
-            for (let i = 0; i < normals.length; i++) {
-                const normal = normals[i];
-                const center = centers[i];
-                const toCam = new THREE.Vector3().subVectors(cameraPos, center);
-                if (normal.dot(toCam) > 0) {
-                    hasVisibleFace = true;
-                    break;  // Достаточно одной видимой грани
-                }
-            }
-            
-            if (!hasVisibleFace) {
-                return;  // Пропускаем ребро только если все грани невидимы
-            }
-        }
-
-        // Применяем матрицу вида и проекции
-        const viewProjMatrix = new THREE.Matrix4();
-        viewProjMatrix.multiplyMatrices(projMatrix, viewMatrix);
+        // Выбираем случайную перестановку цветов для текущего куба
+        const colorOrder = colorPermutations[Math.floor(cubeIndex / 12) % colorPermutations.length];
         
-        const point1Projected = point1.clone().applyMatrix4(viewProjMatrix);
-        const point2Projected = point2.clone().applyMatrix4(viewProjMatrix);
+        // Создаем три копии линии с разными смещениями и цветами
+        for (let i = 0; i < 3; i++) {
+            const point1 = new THREE.Vector3(
+                positions[v1 * 3],
+                positions[v1 * 3 + 1],
+                positions[v1 * 3 + 2]
+            );
+            const point2 = new THREE.Vector3(
+                positions[v2 * 3],
+                positions[v2 * 3 + 1],
+                positions[v2 * 3 + 2]
+            );
 
-        // Проверяем видимость точек
-        if (point1Projected.z < -1 || point1Projected.z > 1 || point2Projected.z < -1 || point2Projected.z > 1) {
-            return;
+            // Применяем все трансформации в правильном порядке
+            point1.applyMatrix4(modelMatrix);
+            point2.applyMatrix4(modelMatrix);
+
+            // Добавляем RGB-shift смещение в мировом пространстве
+            const shift = shifts[i];
+            point1.x += shift.x;
+            point1.y += shift.y;
+            point2.x += shift.x;
+            point2.y += shift.y;
+
+            // Применяем матрицу вида и проекции
+            const viewProjMatrix = new THREE.Matrix4().multiplyMatrices(projMatrix, viewMatrix);
+            const point1Projected = point1.clone().applyMatrix4(viewProjMatrix);
+            const point2Projected = point2.clone().applyMatrix4(viewProjMatrix);
+
+            // Проверяем видимость в пространстве отсечения
+            if (point1Projected.z < -1 || point1Projected.z > 1 ||
+                point2Projected.z < -1 || point2Projected.z > 1) {
+                continue;
+            }
+
+            // Преобразуем в координаты холста с правильным масштабированием
+            const canvasSize = 6.5;
+            const margin = 0.2; // добавляем небольшой отступ от краев
+            const scale = canvasSize - margin * 2;
+
+            // Используем правильное преобразование из NDC в координаты холста
+            const x1 = margin + (point1Projected.x + 1) * 0.5 * scale;
+            const y1 = margin + (-point1Projected.y + 1) * 0.5 * scale;
+            const x2 = margin + (point2Projected.x + 1) * 0.5 * scale;
+            const y2 = margin + (-point2Projected.y + 1) * 0.5 * scale;
+
+            lines.push({
+                points: [
+                    [x1, y1],
+                    [x2, y2]
+                ],
+                color: colorOrder[i]
+            });
         }
-
-        // Преобразуем из NDC в координаты холста
-        const canvasSize = 6.5; // размер холста в см
         
-        // Нормализуем координаты
-        const x1 = (point1Projected.x + 1) * 0.5;
-        const y1 = (-point1Projected.y + 1) * 0.5;
-        const x2 = (point2Projected.x + 1) * 0.5;
-        const y2 = (-point2Projected.y + 1) * 0.5;
-
-        lines.push([
-            [x1 * canvasSize, y1 * canvasSize],
-            [x2 * canvasSize, y2 * canvasSize]
-        ]);
+        if ((cubeIndex + 1) % 12 === 0) {
+            // Увеличиваем счетчик только после обработки всех рёбер одного куба
+            cubeIndex++;
+        }
     });
 }
 
@@ -331,27 +387,39 @@ const sketch = () => {
         context.fillStyle = 'white';
         context.fillRect(0, 0, width, height);
 
-        // Рисуем линии
+        // Рисуем линии с разными цветами
         lines.forEach(line => {
             context.beginPath();
-            line.forEach(p => context.lineTo(p[0], p[1]));
-            context.strokeStyle = 'black';
+            line.points.forEach(p => context.lineTo(p[0], p[1]));
+            context.strokeStyle = line.color;
             context.lineWidth = 0.01;
             context.lineJoin = 'round';
             context.lineCap = 'round';
             context.stroke();
         });
 
+        // Модифицируем SVG экспорт для поддержки цветов
+        const colors = ['#ff0000', '#00ff00', '#0000ff'];
+        const colorNames = ['red', 'green', 'blue'];
+        
+        // Создаем отдельные массивы линий для каждого цвета
+        const coloredLines = colors.map(color => 
+            lines.filter(line => line.color === color)
+                 .map(line => line.points)
+        );
+
         return [
             context.canvas,
-            {
+            // Экспортируем три отдельных SVG файла
+            ...coloredLines.map((lines, i) => ({
                 data: polylinesToSVG(lines, {
                     width,
                     height,
-                    units: 'cm'
+                    units: 'cm',
+                    attributes: { stroke: colors[i] }
                 }),
-                extension: '.svg'
-            }
+                extension: `.${colorNames[i]}.svg`
+            }))
         ];
     };
 };
