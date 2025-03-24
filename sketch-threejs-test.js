@@ -51,10 +51,10 @@ function createProceduralCubesGeometry(radius, segments) {
     const indices = [];
     
     // Параметры спирали
-    const turns = 2;
+    const turns = 4;  // Увеличиваем количество витков
     const pointsPerTurn = segments / 2;
     const totalPoints = turns * pointsPerTurn;
-    const cubeSize = 0.1;
+    const cubeSize = 0.1;  // Размер куба
     const compressionXZ = 0.4;
     
     // Создаем две спирали (как в ДНК)
@@ -63,9 +63,9 @@ function createProceduralCubesGeometry(radius, segments) {
         
         // Создаем точки вдоль спирали
         for (let i = 0; i < totalPoints; i++) {
-            const t = i / totalPoints;
+            const t = i / totalPoints;  // Возвращаем полный диапазон t
             const theta = 2 * Math.PI * turns * t + spiralOffset;
-            const phi = Math.PI * t;
+            const phi = Math.PI * t;  // Возвращаем полный диапазон phi
             
             // Базовая точка на спирали
             const sinPhi = Math.sin(phi);
@@ -136,20 +136,20 @@ const segments = 48; // уменьшаем количество сегменто
 currentGeometry = createProceduralCubesGeometry(radius, segments);
 
 // Добавляем небольшой шум к вершинам
-const positions = currentGeometry.attributes.position;
-const normals = currentGeometry.attributes.normal;
+const positions = currentGeometry.attributes.position.array;
+const normals = currentGeometry.attributes.normal.array;
 
-for (let i = 0; i < positions.count; i++) {
+for (let i = 0; i < positions.length; i += 3) {
     const normal = new THREE.Vector3(
-        normals.getX(i),
-        normals.getY(i),
-        normals.getZ(i)
+        normals[i],
+        normals[i + 1],
+        normals[i + 2]
     );
     
     const pos = new THREE.Vector3(
-        positions.getX(i),
-        positions.getY(i),
-        positions.getZ(i)
+        positions[i],
+        positions[i + 1],
+        positions[i + 2]
     );
 
     // Создаем минимальный шум для небольшого разнообразия
@@ -164,7 +164,9 @@ for (let i = 0; i < positions.count; i++) {
     // Смещаем вершину по нормали
     pos.add(normal.multiplyScalar(noise));
     
-    positions.setXYZ(i, pos.x, pos.y, pos.z);
+    positions[i] = pos.x;
+    positions[i + 1] = pos.y;
+    positions[i + 2] = pos.z;
 }
 
 // Обновляем нормали после деформации
